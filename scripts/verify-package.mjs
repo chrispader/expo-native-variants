@@ -360,7 +360,7 @@ if (getNativeVariant('com.acme.app', {production: {applicationId: 'com.acme.app'
 const CONSUMER_PACKAGE = {
   dependencies: {
     expo: '57.0.24',
-    'expo-native-variants': '0.1.0-alpha.0',
+    'expo-native-variants': '0.1.0-alpha.1',
     react: '19.2.3',
     'react-native': '0.86.3',
   },
