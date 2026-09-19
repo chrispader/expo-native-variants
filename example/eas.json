@@ -1,0 +1,23 @@
+{
+  "cli": { "version": ">=24.7.0" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "NATIVE_VARIANT": "development" },
+      "android": { "gradleCommand": ":app:assembleDevelopmentDebug" },
+      "ios": { "simulator": true, "buildConfiguration": "Debug" }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": { "NATIVE_VARIANT": "preview" },
+      "android": { "gradleCommand": ":app:assemblePreviewRelease" },
+      "ios": { "simulator": true, "buildConfiguration": "Release" }
+    },
+    "production": {
+      "env": { "NATIVE_VARIANT": "production" },
+      "android": { "gradleCommand": ":app:bundleProductionRelease" },
+      "ios": { "buildConfiguration": "Release" }
+    }
+  }
+}

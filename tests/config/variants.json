@@ -1,0 +1,17 @@
+{
+  "defaultVariant": "production",
+  "variants": {
+    "preview": {
+      "applicationId": "com.acme.app.preview",
+      "displayName": "Acme Preview",
+      "runMode": "release",
+      "urlScheme": "acme-preview"
+    },
+    "production": {
+      "applicationId": "com.acme.app",
+      "displayName": "Acme",
+      "runMode": "release",
+      "urlScheme": "acme"
+    }
+  }
+}

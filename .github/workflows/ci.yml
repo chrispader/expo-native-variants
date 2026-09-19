@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate source and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: true
+      NI_DEFAULT_AGENT: npm
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24
+
+      - name: Set up package tools
+        run: npx --yes @antfu/ni@30.5.0 -g @antfu/ni@30.5.0
+
+      - name: Install dependencies
+        run: ni --frozen
+
+      - name: Run unit tests
+        run: nr test
+
+      - name: Check types
+        run: nr typecheck
+
+      - name: Verify package output
+        run: nr verify:package
+
+      - name: Check example types
+        run: nr typecheck:example
+
+      - name: Run compiled consumer integration
+        run: nr test:integration

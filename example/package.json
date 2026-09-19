@@ -1,0 +1,22 @@
+{
+  "name": "expo-native-variants-example",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "prebuild": "expo prebuild --no-install",
+    "config": "expo config --type public"
+  },
+  "dependencies": {
+    "expo": "57.0.24",
+    "expo-application": "57.0.3",
+    "expo-dev-client": "57.0.19",
+    "expo-native-variants": "file:..",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.4"
+  }
+}

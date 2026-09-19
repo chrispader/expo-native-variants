@@ -1,0 +1,11 @@
+coverage/
+dist/
+node_modules/
+*.log
+*.tgz
+.DS_Store
+.env*
+.artifacts/
+example/.expo/
+example/android/
+example/ios/

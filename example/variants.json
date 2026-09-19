@@ -1,0 +1,23 @@
+{
+  "defaultVariant": "production",
+  "variants": {
+    "development": {
+      "displayName": "Variants Dev",
+      "applicationId": "com.exponativevariants.example.dev",
+      "urlScheme": "nativevariants-dev",
+      "runMode": "debug"
+    },
+    "preview": {
+      "displayName": "Variants Preview",
+      "applicationId": "com.exponativevariants.example.preview",
+      "urlScheme": "nativevariants-preview",
+      "runMode": "release"
+    },
+    "production": {
+      "displayName": "Variants",
+      "applicationId": "com.exponativevariants.example",
+      "urlScheme": "nativevariants",
+      "runMode": "release"
+    }
+  }
+}

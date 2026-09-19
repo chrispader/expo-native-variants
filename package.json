@@ -1,0 +1,73 @@
+{
+  "name": "expo-native-variants",
+  "version": "0.1.0-alpha.0",
+  "description": "Generate multiple native Expo variants in one prebuild.",
+  "author": "Christoph Pader",
+  "license": "MIT",
+  "homepage": "https://github.com/chrispader/expo-native-variants#readme",
+  "bugs": {
+    "url": "https://github.com/chrispader/expo-native-variants/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrispader/expo-native-variants.git"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "default": "./dist/index.mjs"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.mjs",
+      "require": "./dist/runtime/index.js",
+      "default": "./dist/runtime/index.mjs"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.mjs",
+      "require": "./dist/config/index.js",
+      "default": "./dist/config/index.mjs"
+    },
+    "./app.plugin.js": "./app.plugin.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "app.plugin.js",
+    "dist"
+  ],
+  "workspaces": [
+    "example"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build:native:android": "node scripts/build-native.mjs android",
+    "build:native:ios": "node scripts/build-native.mjs ios",
+    "test": "vitest run",
+    "test:integration": "tsup && vitest run --config vitest.integration.config.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "typecheck:example": "tsc --project example/tsconfig.json --noEmit",
+    "verify:package": "tsup && node scripts/verify-package.mjs"
+  },
+  "engines": {
+    "node": ">=20.19.4"
+  },
+  "peerDependencies": {
+    "expo": ">=57.0.0 <58.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "expo": "57.0.24",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
