@@ -11,6 +11,7 @@ This records checks performed on September 19, 2026 for the published `0.1.0-alp
 | React Native | 0.86.3 |
 | React | 19.2.3 |
 | Node.js | 24.11.0 |
+| Bun | 1.3.1 |
 | Xcode | 27.0, build 27A266a |
 | CocoaPods | 1.17.0 |
 | Java | Temurin 17.0.20.1 |

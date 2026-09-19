@@ -2,7 +2,7 @@
 
 Expo's usual variant setup regenerates the native project for the selected environment. This package will generate every configured variant together, so developers can switch schemes or flavors while keeping `ios/` and `android/` generated and ignored by Git.
 
-Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub, and `0.1.0-alpha.0` is published under the npm `next` tag.
+Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub, and `0.1.0-alpha.0` is published under the npm `next` tag. The repository uses Bun for package management.
 
 ## Viability and support boundary
 

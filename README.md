@@ -12,6 +12,10 @@ See the [validation record](./VALIDATION.md) for tested toolchain versions and r
 
 Install `expo-native-variants` in your Expo project and add it to the `plugins` array in your app config. Use complete application identifiers so the variants can be installed together.
 
+```sh
+bun add expo-native-variants@next
+```
+
 ```json
 {
   "expo": {
@@ -162,7 +166,7 @@ EAS support remains experimental until its credential preflight and cloud artifa
 
 The [example](./example) contains three variants and displays the installed identifier, resolved variant, and debug/release mode. Install the repository dependencies, build the package, generate the example's native projects, and open its iOS workspace or Android project.
 
-The root package scripts provide `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
+This repository uses Bun 1.3.1. The root package scripts provide `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
 
 ## License
 

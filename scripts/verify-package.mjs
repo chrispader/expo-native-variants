@@ -73,35 +73,46 @@ async function verifyPackage() {
 }
 
 async function packArtifact(temporaryRoot) {
-  const cacheDirectory = path.join(temporaryRoot, 'cache');
   const artifactDirectory = path.join(temporaryRoot, 'artifact');
-  await Promise.all([
-    mkdir(cacheDirectory, {recursive: true}),
-    mkdir(artifactDirectory, {recursive: true}),
-  ]);
+  await mkdir(artifactDirectory, {recursive: true});
 
   const {stdout} = await executeFile(
-    process.platform === 'win32' ? 'na.cmd' : 'na',
-    ['pack', '--json', '--pack-destination', artifactDirectory],
+    process.platform === 'win32' ? 'bun.exe' : 'bun',
+    [
+      'pm',
+      'pack',
+      '--destination',
+      artifactDirectory,
+      '--ignore-scripts',
+      '--quiet',
+    ],
     {
       cwd: repositoryRoot,
-      env: {...process.env, npm_config_cache: cacheDirectory},
       maxBuffer: 4 * 1024 * 1024,
     },
   );
-  const result = JSON.parse(stdout);
-  if (!Array.isArray(result) || result.length !== 1 || !isPackArtifact(result[0])) {
-    throw new Error('Package packing did not return exactly one artifact.');
+  const artifactPath = path.resolve(stdout.trim());
+  const filename = path.basename(artifactPath);
+  if (
+    filename.length === 0 ||
+    path.dirname(artifactPath) !== path.resolve(artifactDirectory) ||
+    path.extname(filename) !== '.tgz'
+  ) {
+    throw new Error('Packed artifact returned an unsafe path.');
   }
-
-  const artifact = result[0];
-  if (path.basename(artifact.filename) !== artifact.filename) {
-    throw new Error('Packed artifact returned an unsafe filename.');
-  }
-  await assertFile(path.join(artifactDirectory, artifact.filename), artifact.filename);
+  await assertFile(artifactPath, filename);
+  const {stdout: archiveListing} = await executeFile(
+    'tar',
+    ['-tzf', artifactPath],
+    {maxBuffer: 4 * 1024 * 1024},
+  );
   return {
-    filename: path.join(artifactDirectory, artifact.filename),
-    files: artifact.files.map(({path: filePath}) => filePath).sort(),
+    filename: artifactPath,
+    files: archiveListing
+      .split('\n')
+      .filter((filePath) => filePath.startsWith('package/') && !filePath.endsWith('/'))
+      .map((filePath) => filePath.slice('package/'.length))
+      .sort(),
   };
 }
 
@@ -431,21 +442,6 @@ async function assertFile(filePath, label) {
   if (!details.isFile()) {
     throw new Error(`${label} is not a file.`);
   }
-}
-
-function isPackArtifact(value) {
-  return (
-    isRecord(value) &&
-    typeof value.filename === 'string' &&
-    Array.isArray(value.files) &&
-    value.files.every(
-      (file) => isRecord(file) && typeof file.path === 'string',
-    )
-  );
-}
-
-function isRecord(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function assertEqual(actual, expected, label) {

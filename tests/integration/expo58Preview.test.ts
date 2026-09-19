@@ -105,16 +105,15 @@ async function createPreviewConsumer(): Promise<string> {
 }
 
 async function installPreview(root: string): Promise<void> {
-  await executeFile(process.platform === 'win32' ? 'ni.cmd' : 'ni', ['--ignore-scripts'], {
-    cwd: root,
-    env: {
-      ...process.env,
-      CI: '1',
-      NI_DEFAULT_AGENT: 'npm',
-      npm_config_cache: path.join(root, '.cache'),
+  await executeFile(
+    process.platform === 'win32' ? 'bun.exe' : 'bun',
+    ['install', '--ignore-scripts', '--cache-dir', path.join(root, '.cache')],
+    {
+      cwd: root,
+      env: {...process.env, CI: '1'},
+      maxBuffer: 8 * 1024 * 1024,
     },
-    maxBuffer: 8 * 1024 * 1024,
-  });
+  );
 }
 
 async function copyCompiledPackage(root: string): Promise<void> {

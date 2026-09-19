@@ -8,7 +8,6 @@ permissions:
 
 env:
   CI: true
-  NI_DEFAULT_AGENT: npm
 
 jobs:
   android:
@@ -30,21 +29,23 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up package tools
-        run: npx --yes @antfu/ni@30.5.0 -g @antfu/ni@30.5.0
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.3.1
 
       - name: Install dependencies
-        run: ni --frozen
+        run: bun install --frozen-lockfile
 
       - name: Build config plugin
-        run: nr build
+        run: bun run build
 
       - name: Generate Android project
         working-directory: example
-        run: nr prebuild --clean --platform android
+        run: bun run prebuild --clean --platform android
 
       - name: Build Android matrix
-        run: nr build:native:android
+        run: bun run build:native:android
 
       - name: Upload Android artifacts and logs
         if: always()
@@ -75,25 +76,27 @@ jobs:
         with:
           node-version: 24
 
-      - name: Set up package tools
-        run: npx --yes @antfu/ni@30.5.0 -g @antfu/ni@30.5.0
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version: 1.3.1
 
       - name: Install dependencies
-        run: ni --frozen
+        run: bun install --frozen-lockfile
 
       - name: Build config plugin
-        run: nr build
+        run: bun run build
 
       - name: Generate iOS project
         working-directory: example
-        run: nr prebuild --clean --platform ios
+        run: bun run prebuild --clean --platform ios
 
       - name: Install CocoaPods dependencies
         working-directory: example/ios
         run: pod install
 
       - name: Build iOS matrix
-        run: nr build:native:ios
+        run: bun run build:native:ios
 
       - name: Upload iOS artifacts and logs
         if: always()
