@@ -2,7 +2,7 @@
 
 Generate every native app variant in one Expo prebuild. Switch between development, preview, and production in Xcode or Android Studio while keeping `ios/` and `android/` generated and ignored by Git.
 
-The npm version `0.0.0` contains only a package-name reservation. Build from this repository until the first implementation release is published.
+The implementation is available as the `0.1.0-alpha.0` prerelease under the `next` tag. The `latest` tag still points to the empty `0.0.0` package-name reservation.
 
 This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 

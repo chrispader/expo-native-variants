@@ -1,6 +1,6 @@
 # Validation record
 
-This records checks performed on September 19, 2026 for the unpublished `0.1.0-alpha.0` implementation. The npm version `0.0.0` is a name reservation containing only `package.json`.
+This records checks performed on September 19, 2026 for the published `0.1.0-alpha.0` prerelease. Version `0.0.0` is a name reservation containing only `package.json`.
 
 ## Build environment
 

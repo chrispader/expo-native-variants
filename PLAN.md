@@ -2,7 +2,7 @@
 
 Expo's usual variant setup regenerates the native project for the selected environment. This package will generate every configured variant together, so developers can switch schemes or flavors while keeping `ios/` and `android/` generated and ignored by Git.
 
-Status: approved for implementation on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation uses GPT-5.6-Sol subagents. Chris authorized an empty `0.0.0` npm reservation containing only `package.json`; that reservation is published. Publishing the implementation remains on hold. GitHub source publication is approved.
+Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub, and `0.1.0-alpha.0` is published under the npm `next` tag.
 
 ## Viability and support boundary
 
@@ -155,7 +155,7 @@ Use a public `chrispader/expo-native-variants` repository and the unscoped npm n
 
 Propose the MIT license, a README showing the supported native workflows, a compatibility table, limitations, a working example, and contribution/release guidance. Use conventional commits and attempt signing with the configured key. Keep the initial branch focused on the package.
 
-After the approved implementation passes its checks, push the source to the public repository. Version `0.0.0` has been published with only `package.json` to reserve the npm name. Publishing `0.1.0-alpha.0` remains on hold until Chris authorizes it. After that publication, verify installation from the registry before considering a stable release. Create matching GitHub releases when actual implementation versions are released.
+The source is public and `0.1.0-alpha.0` is published under the `next` tag. Version `0.0.0` remains the `latest` package and contains only `package.json`. Verify the prerelease in consumer projects before considering a stable release. Create matching GitHub releases when stable implementation versions are released.
 
 Use GitHub Actions trusted publishing with OIDC and provenance for subsequent releases. Account ownership, initial package bootstrap, any required two-factor challenge, and the trusted-publisher connection must be completed using the actual account at release time. Do not assume credentials or an existing publisher connection. [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
@@ -163,4 +163,4 @@ Use GitHub Actions trusted publishing with OIDC and provenance for subsequent re
 
 Start with one GPT-5.6-Sol subagent for the feasibility spike and shared contract. Once that contract is stable, use three GPT-5.6-Sol subagents with separate file ownership for Android, iOS, and package/runtime/integration tests. The coordinating agent integrates the changes and checks the support claims; a subsequent Sol review examines cross-platform behavior and release readiness.
 
-The first checkpoint is native feasibility, the second is reproducible side-by-side operation, and the last is an installable package with accurate support claims. Implementation and GitHub publication are approved. npm publication requires a later instruction to lift the current hold.
+The first checkpoint was native feasibility, the second was reproducible side-by-side operation, and the last was an installable prerelease with accurate support claims. All three checkpoints are complete.
