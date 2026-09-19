@@ -19,7 +19,8 @@ The first supported setup will be an Expo-generated project with one iOS applica
 | Runtime variant detection | Use the installed application identifier through an optional JavaScript helper |
 | EAS builds with ignored native folders | Separate compatibility milestone, including credential preflight |
 | Arbitrary per-variant Expo configuration | Outside the initial API |
-| Icons, Firebase files, update channels, entitlements, extensions | Follow-up integrations with their own tests |
+| Icons, Firebase files, update channels, entitlements | Follow-up integrations with their own tests |
+| iOS extension targets | Implemented for explicitly configured app-extension and ExtensionKit targets |
 
 ### Limits that affect the design
 
@@ -31,7 +32,7 @@ The first supported setup will be an Expo-generated project with one iOS applica
 
 **JavaScript environment values do not follow native scheme selection.** Bundled `EXPO_PUBLIC_*` values and `extra` are not a dependable source of the installed variant's identity. Use the native application identifier to select a public runtime configuration map. A release bundle or update can still contain its own build-time configuration, which the plugin does not rewrite. [Expo environment variables](https://docs.expo.dev/guides/environment-variables/)
 
-**Third-party integrations need explicit support.** Unique identifiers do not automatically configure OAuth callbacks, associated domains, push provisioning, app groups, Firebase, or update routing. Variant-specific native dependencies and extension targets are outside the initial single-target design. The initial example will leave remote updates disabled. Installing `expo-updates` does not imply that channels are isolated by flavor; documentation and diagnostics must make any shared update configuration explicit. [Expo Updates configuration](https://docs.expo.dev/versions/latest/sdk/updates/)
+**Third-party integrations need explicit support.** Unique identifiers do not automatically configure OAuth callbacks, associated domains, push provisioning, app groups, Firebase, or update routing. Extension target configuration is now explicit and limited to bundle identifiers plus complete configuration cloning; target creation remains the responsibility of a target-generating plugin. The initial example leaves remote updates disabled. Installing `expo-updates` does not imply that channels are isolated by flavor; documentation and diagnostics must make any shared update configuration explicit. [Expo Updates configuration](https://docs.expo.dev/versions/latest/sdk/updates/)
 
 ## Proposed public configuration
 
@@ -113,7 +114,7 @@ The iOS generator keeps one application target and a stable product name. It clo
 
 Add explicit CocoaPods `:debug` and `:release` mappings before dependency installation. Ensure each new configuration uses the right generated CocoaPods settings rather than retaining a stale base-configuration reference. Unmapped configurations default to release in CocoaPods. [CocoaPods configuration mapping](https://guides.cocoapods.org/syntax/podfile.html#project)
 
-Generate shared schemes using the existing target UUID. Run uses `runMode`; Test and Analyze use the variant's debug configuration; Profile and Archive use release. Do not invent test targets. The first release explicitly rejects additional native targets, including existing test targets and extensions. Future test-target support must generate matching configurations and verify the scheme's Test action. Audit configuration-name checks in React Native, Hermes, Expo Constants, and development-client scripts against the pinned versions.
+Generate shared schemes using the existing application target UUID. Run uses `runMode`; Test and Analyze use the variant's debug configuration; Profile and Archive use release. Do not invent test targets. Explicitly configured extension targets receive the same configuration matrix after their target-generating plugins run. Existing native test targets remain unsupported; future test-target support must generate matching configurations and verify the scheme's Test action. Audit configuration-name checks in React Native, Hermes, Expo Constants, and development-client scripts against the pinned versions.
 
 Both generators must isolate the package's URL registrations for each variant, including identifiers that Expo otherwise adds as fallback schemes. Handle development-client launch URLs explicitly. Preserve unrelated integrations and report remaining shared registrations that can cause ambiguous routing. [Expo deep linking](https://docs.expo.dev/linking/into-your-app/)
 

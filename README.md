@@ -4,7 +4,7 @@ Generate every native app variant in one Expo prebuild. Switch between developme
 
 The implementation is available as the `0.1.0-alpha.0` prerelease under the `next` tag. The `latest` tag still points to the empty `0.0.0` package-name reservation.
 
-This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
+This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 
 See the [validation record](./VALIDATION.md) for tested toolchain versions and results.
 
@@ -91,6 +91,52 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 | `ios.xcodeScheme` | Optional Xcode build-scheme name |
 | `android.applicationId` | Optional replacement for the shared identifier on Android |
 
+### iOS extension targets
+
+The plugin can add the variant matrix to extension targets created by another config plugin. List each extension by its exact Xcode target name and give it a bundle identifier suffix:
+
+```ts
+import type {NativeVariantsConfigInput} from 'expo-native-variants/config';
+
+const options = {
+  defaultVariant: 'production',
+  ios: {
+    targets: {
+      AcmeShare: {bundleIdentifierSuffix: '.share'},
+      AcmeWidget: {bundleIdentifierSuffix: '.widget'},
+    },
+  },
+  variants: {
+    development: {
+      displayName: 'Acme Dev',
+      applicationId: 'com.acme.app.dev',
+      urlScheme: 'acme-dev',
+    },
+    production: {
+      displayName: 'Acme',
+      applicationId: 'com.acme.app',
+      urlScheme: 'acme',
+    },
+  },
+} satisfies NativeVariantsConfigInput;
+```
+
+This produces `com.acme.app.dev.share` and `com.acme.app.share` for `AcmeShare`, plus the corresponding widget identifiers. The target-generating plugin remains responsible for creating targets, source files, build phases, frameworks, plist files, and entitlements. Register that plugin before `expo-native-variants`. The `createNativeVariantsConfig` helper already places `expo-native-variants` last.
+
+Keep each suffix equal to the suffix in the target generator's own configuration. `expo-native-variants` validates and applies the resulting identifiers but does not rewrite that plugin's configuration.
+
+The extension's standard `Debug` and `Release` configurations are the templates for every generated variant configuration. Their Swift version, deployment target, plist path, signing settings, entitlements path, frameworks, and build phases remain intact. The application alone receives the variant display name and URL scheme.
+
+For a shared app group, use the generated application-identifier build setting in both the app and extension entitlements:
+
+```ts
+const applicationGroups = [
+  'group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)',
+];
+```
+
+For example, pass that array through `ios.entitlements` for the app and through the extension generator's entitlements configuration. Xcode expands it to the main application bundle identifier for each configuration, so an extension and its containing app share `group.com.acme.app.dev` in development and `group.com.acme.app` in production.
+
 Variant keys determine the Android flavor names and generated iOS configuration names. Identifiers must be unique on each platform. The plugin rejects invalid names and collisions before generating native settings.
 
 The plugin changes the display name while keeping the native target, product name, and Android source namespace stable. It owns its generated files and configuration sections. Repeated prebuilds update them, including renamed or removed variants. If you remove the plugin itself, perform a clean prebuild to remove its native output.
@@ -152,7 +198,9 @@ The [example profiles](./example/eas.json) select Android Gradle tasks and ordin
 
 ## Compatibility
 
-The first release supports Expo's generated Android Groovy template and a single iOS application target. Existing Android product flavors, additional flavor dimensions, Kotlin DSL projects, iOS extensions, and existing native test targets are outside its supported layout.
+The current release supports Expo's generated Android Groovy template, exactly one iOS application target, and explicitly configured iOS app-extension or ExtensionKit-extension targets. Existing Android product flavors, additional flavor dimensions, Kotlin DSL projects, native test targets, App Clips, watch applications, and other target product types remain outside its supported layout. Every additional native target must appear in `ios.targets`; the plugin rejects an unconfigured target rather than generating an incomplete configuration matrix.
+
+Extension support has been tested with `@bacons/apple-targets@5.0.0` using clean Expo prebuilds. That package currently fails while updating its own target during a repeated `expo prebuild --no-clean` on this toolchain, before `expo-native-variants` runs. Use clean prebuilds when combining these versions.
 
 Expo SDK 57's default iOS template does not enable scene lifecycle support. A build linked with the iOS 27 SDK can crash on iOS 27 before JavaScript starts. Use Expo's [official scene-support configuration](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md) when targeting that combination. The example's launch tests use iOS 26.5.
 

@@ -4,6 +4,7 @@ import type {NormalizedNativeVariantsOptions} from '../../src/options';
 import {updatePodfile} from '../../src/ios/podfile';
 
 const options: NormalizedNativeVariantsOptions = {
+  iosTargets: [],
   canonicalVariant: {
     key: 'production',
     displayName: 'Acme',

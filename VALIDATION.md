@@ -50,6 +50,14 @@ Package verification creates the actual tarball, extracts it into a fresh consum
 
 All three experimental EAS selectors resolve the intended app-config identifiers and canonical variant locally. This does not verify EAS credential selection or a cloud build.
 
+## Extension support validation
+
+The repository changes from September 20, 2026 add explicit iOS extension targets. Unit tests verify suffix validation, identifier collision checks, complete Debug/Release configuration cloning, canonical base configurations, stale configuration removal, and preservation of extension settings such as `SWIFT_VERSION` and `CODE_SIGN_ENTITLEMENTS`.
+
+The Expo prebuild integration creates a share extension with `@bacons/apple-targets@5.0.0`. Clean generation and regeneration pass with development, preview, production, and renamed local variants. The generated extension uses identifiers such as `com.acme.app.dev.share`, retains its Swift settings, and contains the same `group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)` entitlement placeholder as the application. The unit suite now contains 101 passing tests.
+
+On this Expo 57 toolchain, `@bacons/apple-targets@5.0.0` throws while replacing its own extension configuration list during a repeated non-clean prebuild. Clean prebuilds pass. The failure occurs in that plugin's custom Xcode mod before `expo-native-variants` runs.
+
 ## Compatibility limits
 
 Expo `58.0.0-preview.3` passed an isolated clean prebuild advisory check. Its native compilation and runtime behavior remain untested. The package's supported peer range stays on SDK 57.

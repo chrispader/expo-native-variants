@@ -1,3 +1,5 @@
+import {writeFile} from 'node:fs/promises';
+
 import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
@@ -11,9 +13,9 @@ const {
   IOSConfig,
   WarningAggregator,
   withDangerousMod,
+  withFinalizedMod,
   withInfoPlist,
   withPodfile,
-  withXcodeProject,
 } = configPlugins;
 
 export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
@@ -64,10 +66,20 @@ export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
     return modConfig;
   }]);
 
-  config = withXcodeProject(config, (modConfig) => {
-    updateXcodeProject(modConfig.modResults, options);
+  config = withFinalizedMod(config, ['ios', async (modConfig) => {
+    if (modConfig.modRequest.introspect) {
+      return modConfig;
+    }
+    const projectPath = IOSConfig.Paths.getPBXProjectPath(
+      modConfig.modRequest.projectRoot,
+    );
+    const project = IOSConfig.XcodeUtils.getPbxproj(
+      modConfig.modRequest.projectRoot,
+    );
+    updateXcodeProject(project, options);
+    await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;
-  });
+  }]);
 
   return config;
 };

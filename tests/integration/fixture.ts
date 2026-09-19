@@ -7,10 +7,17 @@ type VariantSettings = Readonly<{
   urlScheme: string;
 }>;
 
+type IosTargetSettings = Readonly<{
+  bundleIdentifierSuffix: string;
+}>;
+
 export type PrebuildSettings = Readonly<{
   neighborPosition: NeighborPosition;
   options: Readonly<{
     defaultVariant: string;
+    ios: Readonly<{
+      targets: Readonly<Record<string, IosTargetSettings>>;
+    }>;
     variants: Readonly<Record<string, VariantSettings>>;
   }>;
 }>;
@@ -20,6 +27,7 @@ export function initialSettings(neighborPosition: NeighborPosition): PrebuildSet
     neighborPosition,
     options: {
       defaultVariant: 'production',
+      ios: extensionTargets(),
       variants: {
         development: variant('Acme Dev', 'com.acme.app.dev', 'acme-dev', 'debug'),
         preview: variant('Acme Preview', 'com.acme.app.preview', 'acme-preview', 'release'),
@@ -34,12 +42,21 @@ export function renamedSettings(neighborPosition: NeighborPosition): PrebuildSet
     neighborPosition,
     options: {
       defaultVariant: 'production',
+      ios: extensionTargets(),
       variants: {
         local: variant('Acme Local', 'com.acme.app.local', 'acme-local', 'debug'),
         production: variant('Acme', 'com.acme.app', 'acme', 'release'),
       },
     },
   };
+}
+
+function extensionTargets() {
+  return {
+    targets: {
+      AcmeShare: {bundleIdentifierSuffix: '.share'},
+    },
+  } as const;
 }
 
 function variant(
@@ -53,6 +70,7 @@ function variant(
 
 export const CONSUMER_PACKAGE = {
   dependencies: {
+    '@bacons/apple-targets': '5.0.0',
     expo: '57.0.24',
     'expo-native-variants': '0.1.0-alpha.0',
     react: '19.2.3',
@@ -74,11 +92,42 @@ module.exports = {
   name: 'Acme',
   slug: 'acme-native-variants-integration',
   version: '1.0.0',
-  plugins:
-    settings.neighborPosition === 'before'
+  ios: {
+    bundleIdentifier: 'com.acme.app',
+    entitlements: {
+      'com.apple.security.application-groups': [
+        'group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)',
+      ],
+    },
+  },
+  plugins: [
+    '@bacons/apple-targets',
+    ...(settings.neighborPosition === 'before'
       ? [neighbor, nativeVariants]
-      : [nativeVariants, neighbor],
+      : [nativeVariants, neighbor]),
+  ],
 };
+`;
+
+export const APPLE_TARGET_CONFIG = `'use strict';
+
+module.exports = {
+  type: 'share',
+  name: 'AcmeShare',
+  displayName: 'Acme',
+  bundleIdentifier: '.share',
+  deploymentTarget: '16.4',
+  entitlements: {
+    'com.apple.security.application-groups': [
+      'group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)',
+    ],
+  },
+};
+`;
+
+export const SHARE_VIEW_CONTROLLER = `import UIKit
+
+final class ShareViewController: UIViewController {}
 `;
 
 export const NEIGHBOR_PLUGIN = `'use strict';

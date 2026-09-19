@@ -45,7 +45,7 @@ describe(syncSchemeFiles, () => {
       platformProjectRoot: directory,
       projectName: 'Acme',
       metadata,
-      options: {canonicalVariant: variant, variants: [variant]},
+      options: {canonicalVariant: variant, iosTargets: [], variants: [variant]},
     });
 
     await expect(stat(path.join(directory, '.expo-native-variants.json'))).rejects.toMatchObject({
@@ -57,6 +57,7 @@ describe(syncSchemeFiles, () => {
     const directory = await createTemporaryDirectory();
     const options: NormalizedNativeVariantsOptions = {
       canonicalVariant: variant,
+      iosTargets: [],
       variants: [variant],
     };
 
@@ -82,6 +83,7 @@ describe(syncSchemeFiles, () => {
     const directory = await createTemporaryDirectory();
     const firstOptions: NormalizedNativeVariantsOptions = {
       canonicalVariant: variant,
+      iosTargets: [],
       variants: [variant],
     };
     const renamedVariant = {
@@ -103,7 +105,7 @@ describe(syncSchemeFiles, () => {
       platformProjectRoot: directory,
       projectName: 'Acme',
       metadata,
-      options: {canonicalVariant: renamedVariant, variants: [renamedVariant]},
+      options: {canonicalVariant: renamedVariant, iosTargets: [], variants: [renamedVariant]},
     });
 
     await expect(readFile(getSchemePath(directory, variant.iosScheme))).rejects.toMatchObject({
@@ -116,6 +118,7 @@ describe(syncSchemeFiles, () => {
     const directory = await createTemporaryDirectory();
     const options: NormalizedNativeVariantsOptions = {
       canonicalVariant: variant,
+      iosTargets: [],
       variants: [variant],
     };
     await syncSchemeFiles({

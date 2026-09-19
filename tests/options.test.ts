@@ -68,10 +68,32 @@ describe('normalizeNativeVariants', () => {
         urlScheme: 'acme',
       },
     ]);
+    expect(result.iosTargets).toEqual([]);
     expect(result.canonicalVariant).toBe(result.variants[2]);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.variants)).toBe(true);
     expect(result.variants.every(Object.isFrozen)).toBe(true);
+  });
+
+  it('normalizes configured iOS extension targets', () => {
+    const result = normalizeNativeVariants({
+      configName: 'Acme',
+      options: {
+        defaultVariant: 'production',
+        ios: {
+          targets: {
+            AcmeShare: {bundleIdentifierSuffix: '.share'},
+          },
+        },
+        variants,
+      },
+    });
+
+    expect(result.iosTargets).toEqual([
+      {bundleIdentifierSuffix: '.share', name: 'AcmeShare'},
+    ]);
+    expect(Object.isFrozen(result.iosTargets)).toBe(true);
+    expect(result.iosTargets.every(Object.isFrozen)).toBe(true);
   });
 
   it('applies platform overrides and an explicit scheme', () => {
@@ -132,6 +154,18 @@ describe('normalizeNativeVariants', () => {
   it.each([
     [{defaultVariant: 'production', variants, extra: true}, 'Plugin options'],
     [
+      {defaultVariant: 'production', ios: {extra: true}, variants},
+      'Plugin options ios',
+    ],
+    [
+      {
+        defaultVariant: 'production',
+        ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.share', extra: true}}},
+        variants,
+      },
+      'iOS target "AcmeShare"',
+    ],
+    [
       {
         defaultVariant: 'production',
         variants: {
@@ -174,6 +208,36 @@ describe('normalizeNativeVariants', () => {
     [{defaultVariant: '', variants}, 'defaultVariant must be a nonempty'],
   ])('rejects empty or unknown variant selections', (options, message) => {
     expect(() => normalizeNativeVariants({configName: 'Acme', options})).toThrow(message);
+  });
+
+  it.each([
+    ['share', 'must start with a period'],
+    ['.', 'must start with a period'],
+    ['../share', 'valid reverse-DNS bundle identifier'],
+  ])('rejects invalid iOS target bundle suffix %s', (bundleIdentifierSuffix, message) => {
+    expect(() =>
+      normalizeNativeVariants({
+        configName: 'Acme',
+        options: {
+          defaultVariant: 'production',
+          ios: {targets: {AcmeShare: {bundleIdentifierSuffix}}},
+          variants,
+        },
+      }),
+    ).toThrow(message);
+  });
+
+  it('rejects extension identifiers that collide with another variant application', () => {
+    expect(() =>
+      normalizeNativeVariants({
+        configName: 'Acme',
+        options: {
+          defaultVariant: 'production',
+          ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.dev'}}},
+          variants,
+        },
+      }),
+    ).toThrow('produce the same bundle identifier "com.acme.app.dev"');
   });
 
   it('rejects duplicate effective identifiers independently after overrides', () => {

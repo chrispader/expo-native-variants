@@ -8,6 +8,7 @@ import {reconcileAndroidVariantResources} from '../../src/android/resources';
 import type {NormalizedNativeVariantsOptions} from '../../src/options';
 
 const OPTIONS: NormalizedNativeVariantsOptions = {
+    iosTargets: [],
     canonicalVariant: {
         androidApplicationId: 'com.acme.app',
         androidFlavor: 'production',

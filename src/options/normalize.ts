@@ -1,11 +1,14 @@
 import type {
   NativeVariantRunMode,
   NormalizedNativeVariant,
+  NormalizedNativeVariantsIosTarget,
   NormalizedNativeVariantsOptions,
   NormalizeNativeVariantsArgs,
 } from './types';
 
-const ROOT_KEYS = new Set(['canonicalVariant', 'defaultVariant', 'variants']);
+const ROOT_KEYS = new Set(['canonicalVariant', 'defaultVariant', 'ios', 'variants']);
+const ROOT_IOS_KEYS = new Set(['targets']);
+const IOS_TARGET_KEYS = new Set(['bundleIdentifierSuffix']);
 const VARIANT_KEYS = new Set([
   'android',
   'applicationId',
@@ -78,7 +81,41 @@ export function normalizeNativeVariants({
   }
 
   const variants = Object.freeze(normalizedVariants);
-  return Object.freeze({canonicalVariant: canonical, variants});
+  const iosTargets = normalizeIosTargets({
+    value: optionsRecord.ios,
+    variants,
+  });
+  return Object.freeze({canonicalVariant: canonical, iosTargets, variants});
+}
+
+function normalizeIosTargets({
+  value,
+  variants,
+}: Readonly<{
+  value: unknown;
+  variants: readonly NormalizedNativeVariant[];
+}>): readonly NormalizedNativeVariantsIosTarget[] {
+  if (value === undefined) {
+    return Object.freeze([]);
+  }
+
+  const ios = requireRecord(value, 'Plugin options ios');
+  assertKnownKeys(ios, ROOT_IOS_KEYS, 'Plugin options ios');
+  const targets = requireRecord(ios.targets, 'Plugin options ios.targets');
+  const normalizedTargets = Object.entries(targets).map(([name, target]) => {
+    validateFileLabel(name, `iOS target name "${name}"`);
+    const targetRecord = requireRecord(target, `iOS target "${name}"`);
+    assertKnownKeys(targetRecord, IOS_TARGET_KEYS, `iOS target "${name}"`);
+    const bundleIdentifierSuffix = requireNonemptyString(
+      targetRecord.bundleIdentifierSuffix,
+      `iOS target "${name}" bundleIdentifierSuffix`,
+    );
+    validateBundleIdentifierSuffix({bundleIdentifierSuffix, name, variants});
+    return Object.freeze({bundleIdentifierSuffix, name});
+  });
+
+  assertUniqueIosTargets(normalizedTargets, variants);
+  return Object.freeze(normalizedTargets);
 }
 
 function normalizeVariant({
@@ -245,6 +282,67 @@ function validateUniqueValues(variants: readonly NormalizedNativeVariant[]): voi
     selectIdentifier: ({androidApplicationId}) => androidApplicationId,
     variants,
   });
+}
+
+function validateBundleIdentifierSuffix({
+  bundleIdentifierSuffix,
+  name,
+  variants,
+}: Readonly<{
+  bundleIdentifierSuffix: string;
+  name: string;
+  variants: readonly NormalizedNativeVariant[];
+}>): void {
+  if (!bundleIdentifierSuffix.startsWith('.') || bundleIdentifierSuffix === '.') {
+    throw new Error(
+      `iOS target "${name}" bundleIdentifierSuffix must start with a period followed by a valid bundle identifier segment.`,
+    );
+  }
+  for (const variant of variants) {
+    validateIosIdentifier(
+      `${variant.iosBundleIdentifier}${bundleIdentifierSuffix}`,
+      `iOS target "${name}" bundle identifier for variant "${variant.key}"`,
+    );
+  }
+}
+
+function assertUniqueIosTargets(
+  targets: readonly NormalizedNativeVariantsIosTarget[],
+  variants: readonly NormalizedNativeVariant[],
+): void {
+  const targetByName = new Map<string, string>();
+  const identifierOwnerByValue = new Map(
+    variants.map((variant) => [
+      variant.iosBundleIdentifier.toLowerCase(),
+      `variant "${variant.key}" application target`,
+    ]),
+  );
+
+  for (const target of targets) {
+    const normalizedName = target.name.toLowerCase();
+    const existingName = targetByName.get(normalizedName);
+    if (existingName !== undefined) {
+      throw new Error(
+        `iOS targets "${existingName}" and "${target.name}" have the same case-insensitive name.`,
+      );
+    }
+    targetByName.set(normalizedName, target.name);
+
+    for (const variant of variants) {
+      const identifier = `${variant.iosBundleIdentifier}${target.bundleIdentifierSuffix}`;
+      const normalizedIdentifier = identifier.toLowerCase();
+      const owner = identifierOwnerByValue.get(normalizedIdentifier);
+      if (owner !== undefined) {
+        throw new Error(
+          `iOS target "${target.name}" and ${owner} produce the same bundle identifier "${identifier}".`,
+        );
+      }
+      identifierOwnerByValue.set(
+        normalizedIdentifier,
+        `iOS target "${target.name}" for variant "${variant.key}"`,
+      );
+    }
+  }
 }
 
 function assertNoCrossVariantRouteCollision({

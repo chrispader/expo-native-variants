@@ -9,8 +9,10 @@ import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 
 import {
   APP_CONFIG,
+  APPLE_TARGET_CONFIG,
   CONSUMER_PACKAGE,
   NEIGHBOR_PLUGIN,
+  SHARE_VIEW_CONTROLLER,
   initialSettings,
   renamedSettings,
 } from './fixture';
@@ -42,11 +44,11 @@ describe('compiled package prebuild', () => {
     await runPrebuild(consumerRoot, true);
     await assertInitialNativeProject(consumerRoot);
 
-    await runPrebuild(consumerRoot, false);
+    await runPrebuild(consumerRoot, true);
     await assertNoRepeatedOutput(consumerRoot);
 
     await writeSettings(consumerRoot, renamedSettings('after'));
-    await runPrebuild(consumerRoot, false);
+    await runPrebuild(consumerRoot, true);
     await assertRenamedNativeProject(consumerRoot);
   });
 });
@@ -54,8 +56,11 @@ describe('compiled package prebuild', () => {
 async function createConsumer(): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), 'expo-native-variants-'));
   const nodeModules = path.join(root, 'node_modules');
+  const shareTarget = path.join(root, 'targets', 'acme-share');
   await mkdir(nodeModules, {recursive: true});
+  await mkdir(shareTarget, {recursive: true});
   await Promise.all([
+    linkDependency(nodeModules, '@bacons/apple-targets'),
     linkDependency(nodeModules, 'expo'),
     linkDependency(nodeModules, 'react'),
     linkDependency(nodeModules, 'react-native'),
@@ -65,6 +70,16 @@ async function createConsumer(): Promise<string> {
     writeFile(path.join(root, 'index.js'), '', 'utf8'),
     writeFile(path.join(root, 'app.config.js'), APP_CONFIG, 'utf8'),
     writeFile(path.join(root, 'neighbor-plugin.js'), NEIGHBOR_PLUGIN, 'utf8'),
+    writeFile(
+      path.join(shareTarget, 'expo-target.config.js'),
+      APPLE_TARGET_CONFIG,
+      'utf8',
+    ),
+    writeFile(
+      path.join(shareTarget, 'ShareViewController.swift'),
+      SHARE_VIEW_CONTROLLER,
+      'utf8',
+    ),
     writeFile(
       path.join(root, 'package.json'),
       `${JSON.stringify(CONSUMER_PACKAGE, null, 2)}\n`,
@@ -89,9 +104,11 @@ async function copyCompiledPackage(nodeModules: string): Promise<void> {
 }
 
 async function linkDependency(nodeModules: string, dependency: string): Promise<void> {
+  const destination = path.join(nodeModules, dependency);
+  await mkdir(path.dirname(destination), {recursive: true});
   await symlink(
     path.join(repositoryRoot, 'node_modules', dependency),
-    path.join(nodeModules, dependency),
+    destination,
     'dir',
   );
 }
@@ -163,6 +180,12 @@ async function assertInitialNativeProject(root: string): Promise<void> {
   expect(project).toContain('Debug-Development');
   expect(project).toContain('Release-Preview');
   expect(project).toContain('PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app";');
+  expect(project).toContain('name = AcmeShare;');
+  expect(project).toContain('PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app.dev.share";');
+  expect(project).toContain(
+    'EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER = "com.acme.app.dev";',
+  );
+  expect(project).toContain('SWIFT_VERSION = 5.0;');
 
   const schemes = await readGeneratedSchemeNames(projectFile);
   expect(schemes).toEqual(
@@ -181,6 +204,14 @@ async function assertInitialNativeProject(root: string): Promise<void> {
   expect(infoPlist).not.toContain(
     '<string>exp+acme-native-variants-integration</string>',
   );
+
+  const extensionEntitlements = await readFile(
+    path.join(iosRoot, '.targets', 'AcmeShare', 'generated.entitlements'),
+    'utf8',
+  );
+  expect(extensionEntitlements).toContain(
+    'group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)',
+  );
 }
 
 async function assertNoRepeatedOutput(root: string): Promise<void> {
@@ -194,6 +225,7 @@ async function assertNoRepeatedOutput(root: string): Promise<void> {
   const projectFile = await findIosProjectFile(path.join(root, 'ios'));
   const project = await readFile(projectFile, 'utf8');
   expect(count(project, 'Debug-Development')).toBeGreaterThan(0);
+  expect(count(project, 'PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app.dev.share";')).toBe(2);
   expect(await readGeneratedSchemeNames(projectFile)).toHaveLength(3);
 }
 
@@ -217,7 +249,9 @@ async function assertRenamedNativeProject(root: string): Promise<void> {
   const projectFile = await findIosProjectFile(path.join(root, 'ios'));
   const project = await readFile(projectFile, 'utf8');
   expect(project).toContain('Debug-Local');
+  expect(project).toContain('PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app.local.share";');
   expect(project).not.toContain('Debug-Development');
+  expect(project).not.toContain('com.acme.app.dev.share');
   expect(project).not.toContain('Debug-Preview');
   expect(await readGeneratedSchemeNames(projectFile)).toEqual(
     expect.arrayContaining(['Acme-Local.xcscheme', 'Acme-Production.xcscheme']),

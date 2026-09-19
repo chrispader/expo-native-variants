@@ -27,8 +27,11 @@ export type {
   NativeVariantMap,
   NativeVariantOptions,
   NativeVariantRunMode,
+  NativeVariantsIosOptions,
+  NativeVariantsIosTargetOptions,
   NativeVariantsOptions,
   NormalizedNativeVariant,
+  NormalizedNativeVariantsIosTarget,
   NormalizedNativeVariantsOptions,
   NormalizeNativeVariantsArgs,
 } from './options';

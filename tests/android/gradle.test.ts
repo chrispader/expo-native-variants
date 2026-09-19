@@ -5,6 +5,7 @@ import {reconcileAppBuildGradle} from '../../src/android/gradle';
 import type {NormalizedNativeVariantsOptions} from '../../src/options';
 
 const OPTIONS: NormalizedNativeVariantsOptions = {
+    iosTargets: [],
     canonicalVariant: {
         androidApplicationId: 'com.acme.app',
         androidFlavor: 'production',

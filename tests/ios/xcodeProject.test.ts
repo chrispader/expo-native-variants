@@ -31,7 +31,13 @@ const production = {
 
 const options: NormalizedNativeVariantsOptions = {
   canonicalVariant: production,
+  iosTargets: [],
   variants: [development, production],
+};
+
+const extensionOptions: NormalizedNativeVariantsOptions = {
+  ...options,
+  iosTargets: [{bundleIdentifierSuffix: '.share', name: 'AcmeShare'}],
 };
 
 describe(updateXcodeProject, () => {
@@ -101,7 +107,11 @@ describe(updateXcodeProject, () => {
   it('removes stale managed configurations without touching foreign configurations', () => {
     const fixture = createProjectFixture();
     updateXcodeProject(fixture.project, options);
-    const productionOnly = {canonicalVariant: production, variants: [production]};
+    const productionOnly = {
+      canonicalVariant: production,
+      iosTargets: [],
+      variants: [production],
+    };
 
     updateXcodeProject(fixture.project, productionOnly);
 
@@ -111,15 +121,54 @@ describe(updateXcodeProject, () => {
     expect(getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Staging')).toBeDefined();
   });
 
-  it('rejects additional native targets', () => {
+  it('clones extension configurations and preserves native target settings', () => {
     const fixture = createProjectFixture();
-    fixture.sections.nativeTargets.EXTENSION = {
-      isa: 'PBXNativeTarget',
-      productType: 'com.apple.product-type.app-extension',
-    };
+    addExtensionTarget(fixture, {withExistingDevelopmentConfiguration: true});
+
+    updateXcodeProject(fixture.project, extensionOptions);
+
+    const developmentConfig = getConfiguration(
+      fixture,
+      'EXTENSION_CONFIG_LIST',
+      'Debug-Development',
+    );
+    expect(developmentConfig.buildSettings).toMatchObject({
+      CODE_SIGN_ENTITLEMENTS: 'AcmeShare/AcmeShare.entitlements',
+      EXPO_NATIVE_VARIANTS_MANAGED: 'YES',
+      EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER: '"com.acme.app.dev"',
+      EXPO_NATIVE_VARIANT_KEY: '"development"',
+      FOREIGN_EXTENSION_SETTING: 'kept',
+      PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.dev.share"',
+      SWIFT_VERSION: '5.0',
+    });
+    expect(developmentConfig.buildSettings).not.toHaveProperty(
+      'EXPO_NATIVE_VARIANT_DISPLAY_NAME',
+    );
+    expect(developmentConfig.buildSettings).not.toHaveProperty(
+      'EXPO_NATIVE_VARIANT_URL_SCHEME',
+    );
+    expect(
+      getConfiguration(fixture, 'EXTENSION_CONFIG_LIST', 'Debug').buildSettings,
+    ).toMatchObject({
+      EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER: '"com.acme.app"',
+      PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.share"',
+    });
+  });
+
+  it('rejects additional native targets that are not configured', () => {
+    const fixture = createProjectFixture();
+    addExtensionTarget(fixture);
 
     expect(() => updateXcodeProject(fixture.project, options)).toThrow(
-      'exactly one iOS native target',
+      'not configured in ios.targets: AcmeShare',
+    );
+  });
+
+  it('rejects configured extension targets that do not exist', () => {
+    const fixture = createProjectFixture();
+
+    expect(() => updateXcodeProject(fixture.project, extensionOptions)).toThrow(
+      'could not find configured iOS extension target "AcmeShare"',
     );
   });
 });
@@ -210,6 +259,56 @@ function createProjectFixture() {
     pbxXCConfigurationList: () => sections.lists,
   };
   return {project, sections};
+}
+
+function addExtensionTarget(
+  fixture: ReturnType<typeof createProjectFixture>,
+  options: Readonly<{withExistingDevelopmentConfiguration?: boolean}> = {},
+): void {
+  fixture.sections.nativeTargets.EXTENSION = {
+    isa: 'PBXNativeTarget',
+    buildConfigurationList: 'EXTENSION_CONFIG_LIST',
+    name: 'AcmeShare',
+    productName: 'AcmeShare',
+    productType: 'com.apple.product-type.app-extension',
+  };
+  fixture.sections.configurations.EXTENSION_DEBUG = {
+    isa: 'XCBuildConfiguration',
+    buildSettings: {
+      CODE_SIGN_ENTITLEMENTS: 'AcmeShare/AcmeShare.entitlements',
+      PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.share"',
+      SWIFT_VERSION: '5.0',
+    },
+    name: 'Debug',
+  };
+  fixture.sections.configurations.EXTENSION_RELEASE = {
+    isa: 'XCBuildConfiguration',
+    buildSettings: {
+      CODE_SIGN_ENTITLEMENTS: 'AcmeShare/AcmeShare.entitlements',
+      PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.share"',
+      SWIFT_VERSION: '5.0',
+    },
+    name: 'Release',
+  };
+  if (options.withExistingDevelopmentConfiguration === true) {
+    fixture.sections.configurations.EXTENSION_DEVELOPMENT = {
+      isa: 'XCBuildConfiguration',
+      buildSettings: {
+        FOREIGN_EXTENSION_SETTING: 'kept',
+        PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.incomplete.share"',
+      },
+      name: 'Debug-Development',
+    };
+  }
+  fixture.sections.lists.EXTENSION_CONFIG_LIST = {
+    buildConfigurations: [
+      {value: 'EXTENSION_DEBUG', comment: 'Debug'},
+      {value: 'EXTENSION_RELEASE', comment: 'Release'},
+      ...(options.withExistingDevelopmentConfiguration === true
+        ? [{value: 'EXTENSION_DEVELOPMENT', comment: 'Debug-Development'}]
+        : []),
+    ],
+  };
 }
 
 function getConfiguration(
