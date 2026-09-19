@@ -1,4 +1,4 @@
-import type {ConfigPlugin} from 'expo/config-plugins.js';
+import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';

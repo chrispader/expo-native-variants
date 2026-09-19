@@ -8,7 +8,10 @@ export default defineConfig({
     index: 'src/index.ts',
     'runtime/index': 'src/runtime/index.ts',
   },
-  external: ['expo/config', 'expo/config-plugins.js'],
+  esbuildOptions(options) {
+    options.logOverride = {'empty-import-meta': 'silent'};
+  },
+  external: ['expo/config', 'expo/config-plugins'],
   format: ['cjs', 'esm'],
   outExtension({format}) {
     return {js: format === 'esm' ? '.mjs' : '.js'};

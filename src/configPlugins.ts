@@ -1,11 +1,19 @@
-import * as configPluginsNamespace from 'expo/config-plugins.js';
+import {createRequire} from 'node:module';
 
-type ConfigPlugins = typeof configPluginsNamespace;
+import type * as ConfigPluginsNamespace from 'expo/config-plugins';
+
+type ConfigPlugins = typeof ConfigPluginsNamespace;
 type ConfigPluginsModule =
   | ConfigPlugins
   | Readonly<{default: ConfigPlugins}>;
 
-export const configPlugins = unwrapConfigPlugins(configPluginsNamespace);
+const moduleRequire = createRequire(
+  typeof __filename === 'string' ? __filename : import.meta.url,
+);
+
+export const configPlugins = unwrapConfigPlugins(
+  moduleRequire('expo/config-plugins') as ConfigPluginsModule,
+);
 
 function unwrapConfigPlugins(module: ConfigPluginsModule): ConfigPlugins {
   return 'default' in module ? module.default : module;

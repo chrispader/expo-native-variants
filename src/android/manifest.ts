@@ -1,4 +1,4 @@
-import type {AndroidConfig} from 'expo/config-plugins.js';
+import type {AndroidConfig} from 'expo/config-plugins';
 
 const MANAGED_SCHEME = '${nativeVariantScheme}';
 const APPLICATION_ID_SCHEME = '${applicationId}';

@@ -1,4 +1,4 @@
-import type {ConfigPlugin} from 'expo/config-plugins.js';
+import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
 import type {NormalizedNativeVariantsOptions} from '../options';
