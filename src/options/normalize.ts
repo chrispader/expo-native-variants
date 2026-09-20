@@ -6,7 +6,7 @@ import type {
   NormalizeNativeVariantsArgs,
 } from './types';
 
-const ROOT_KEYS = new Set(['canonicalVariant', 'defaultVariant', 'ios', 'variants']);
+const ROOT_KEYS = new Set(['ios', 'variant', 'variants']);
 const ROOT_IOS_KEYS = new Set(['targets']);
 const IOS_TARGET_KEYS = new Set(['bundleIdentifierSuffix']);
 const VARIANT_KEYS = new Set([
@@ -41,43 +41,33 @@ const ANDROID_IDENTIFIER_SEGMENT = /^[A-Za-z][A-Za-z0-9_]*$/;
 export function normalizeNativeVariants({
   configName,
   options,
-  canonicalVariant: canonicalOverride,
 }: NormalizeNativeVariantsArgs): NormalizedNativeVariantsOptions {
   validateFileLabel(configName, 'Expo config name');
   const optionsRecord = requireRecord(options, 'Plugin options');
   assertKnownKeys(optionsRecord, ROOT_KEYS, 'Plugin options');
-
-  const defaultVariant = requireNonemptyString(
-    optionsRecord.defaultVariant,
-    'defaultVariant',
-  );
-  const configuredCanonicalVariant = optionalNonemptyString(
-    optionsRecord.canonicalVariant,
-    'canonicalVariant',
-  );
-  const canonicalVariant = canonicalOverride ?? configuredCanonicalVariant ?? defaultVariant;
-  validateVariantKey(defaultVariant, 'defaultVariant');
-  validateVariantKey(canonicalVariant, 'canonicalVariant');
 
   const variantsRecord = requireRecord(optionsRecord.variants, 'variants');
   const variantEntries = Object.entries(variantsRecord);
   if (variantEntries.length === 0) {
     throw new Error('variants must contain at least one variant.');
   }
+  const firstVariantKey = variantEntries[0]?.[0];
+  if (firstVariantKey === undefined) {
+    throw new Error('variants must contain at least one variant.');
+  }
+  const selectedVariantKey =
+    optionalNonemptyString(optionsRecord.variant, 'variant') ?? firstVariantKey;
+  validateVariantKey(selectedVariantKey, 'variant');
 
-  const normalizedVariants = variantEntries.map(([key, variant]) =>
-    normalizeVariant({configName, key, variant}),
+  const normalizedVariants = variantEntries.map(([key, variant], index) =>
+    normalizeVariant({configName, isPrimary: index === 0, key, variant}),
   );
   validateGeneratedNames(normalizedVariants);
   validateUniqueValues(normalizedVariants);
 
-  if (!Object.hasOwn(variantsRecord, defaultVariant)) {
-    throw new Error(`defaultVariant references unknown variant "${defaultVariant}".`);
-  }
-
-  const canonical = normalizedVariants.find(({key}) => key === canonicalVariant);
-  if (canonical === undefined) {
-    throw new Error(`canonicalVariant references unknown variant "${canonicalVariant}".`);
+  const selectedVariant = normalizedVariants.find(({key}) => key === selectedVariantKey);
+  if (selectedVariant === undefined) {
+    throw new Error(`variant references unknown variant "${selectedVariantKey}".`);
   }
 
   const variants = Object.freeze(normalizedVariants);
@@ -85,7 +75,7 @@ export function normalizeNativeVariants({
     value: optionsRecord.ios,
     variants,
   });
-  return Object.freeze({canonicalVariant: canonical, iosTargets, variants});
+  return Object.freeze({iosTargets, selectedVariant, variants});
 }
 
 function normalizeIosTargets({
@@ -120,10 +110,12 @@ function normalizeIosTargets({
 
 function normalizeVariant({
   configName,
+  isPrimary,
   key,
   variant,
 }: Readonly<{
   configName: string;
+  isPrimary: boolean;
   key: string;
   variant: unknown;
 }>): NormalizedNativeVariant {
@@ -131,19 +123,20 @@ function normalizeVariant({
   const variantRecord = requireRecord(variant, `Variant "${key}"`);
   assertKnownKeys(variantRecord, VARIANT_KEYS, `Variant "${key}"`);
 
-  const displayName = requireNonemptyString(
+  const configLabel = toPascalConfigLabel(key);
+  const displayName = optionalNonemptyString(
     variantRecord.displayName,
     `Variant "${key}" displayName`,
-  );
+  ) ?? (isPrimary ? configName : `${configName} ${configLabel}`);
   validateText(displayName, `Variant "${key}" displayName`);
   const applicationId = requireNonemptyString(
     variantRecord.applicationId,
     `Variant "${key}" applicationId`,
   );
-  const urlScheme = requireNonemptyString(
+  const urlScheme = optionalNonemptyString(
     variantRecord.urlScheme,
     `Variant "${key}" urlScheme`,
-  );
+  ) ?? applicationId;
   validateUrlScheme(urlScheme, `Variant "${key}" urlScheme`);
   const runMode = readRunMode(variantRecord.runMode, key);
   const ios = readIosOptions(variantRecord.ios, key);
@@ -156,7 +149,6 @@ function normalizeVariant({
     `Variant "${key}" Android application ID`,
   );
 
-  const configLabel = toPascalConfigLabel(key);
   const generatedIosScheme = `${configName}-${configLabel}`;
   const iosScheme = ios.xcodeScheme ?? generatedIosScheme;
   validateFileLabel(iosScheme, `Variant "${key}" iOS scheme`);

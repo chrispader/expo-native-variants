@@ -1,9 +1,9 @@
 import {describe, expect, it} from 'vitest';
 
-import {applyCanonicalIdentifiers} from '../src/options/applyCanonicalIdentifiers';
+import {applySelectedVariantIdentifiers} from '../src/options/applySelectedVariantIdentifiers';
 import type {NormalizedNativeVariant} from '../src/options';
 
-const canonicalVariant = {
+const selectedVariant = {
   androidApplicationId: 'com.acme.app',
   androidFlavor: 'production',
   debugConfiguration: 'Debug-Production',
@@ -16,15 +16,15 @@ const canonicalVariant = {
   urlScheme: 'acme',
 } satisfies NormalizedNativeVariant;
 
-describe('applyCanonicalIdentifiers', () => {
+describe('applySelectedVariantIdentifiers', () => {
   it('fills missing base identifiers without changing the shared name or scheme', () => {
-    const config = applyCanonicalIdentifiers(
+    const config = applySelectedVariantIdentifiers(
       {
         name: 'Acme shared project',
         scheme: ['acme-shared', 'oauth-callback'],
         slug: 'acme',
       },
-      canonicalVariant,
+      selectedVariant,
     );
 
     expect(config.ios?.bundleIdentifier).toBe('com.acme.app');
@@ -33,35 +33,20 @@ describe('applyCanonicalIdentifiers', () => {
     expect(config.scheme).toEqual(['acme-shared', 'oauth-callback']);
   });
 
-  it('accepts matching explicit base identifiers', () => {
+  it('replaces existing identifiers with the selected variant', () => {
     expect(
-      applyCanonicalIdentifiers(
+      applySelectedVariantIdentifiers(
         {
-          android: {package: 'com.acme.app'},
-          ios: {bundleIdentifier: 'com.acme.app'},
+          android: {package: 'com.acme.previous'},
+          ios: {bundleIdentifier: 'com.acme.previous'},
           name: 'Acme',
           slug: 'acme',
         },
-        canonicalVariant,
+        selectedVariant,
       ),
     ).toMatchObject({
       android: {package: 'com.acme.app'},
       ios: {bundleIdentifier: 'com.acme.app'},
     });
-  });
-
-  it.each([
-    [
-      {ios: {bundleIdentifier: 'com.acme.wrong'}, name: 'Acme', slug: 'acme'},
-      'ios.bundleIdentifier',
-    ],
-    [
-      {android: {package: 'com.acme.wrong'}, name: 'Acme', slug: 'acme'},
-      'android.package',
-    ],
-  ])('rejects a conflicting explicit %s identity', (config, field) => {
-    expect(() => applyCanonicalIdentifiers(config, canonicalVariant)).toThrow(
-      `${field} is "com.acme.wrong", but canonicalVariant requires "com.acme.app".`,
-    );
   });
 });

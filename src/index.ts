@@ -2,7 +2,7 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';
-import {applyCanonicalIdentifiers} from './options/applyCanonicalIdentifiers';
+import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIdentifiers';
 import {normalizeNativeVariants} from './options';
 import type {NativeVariantsOptions, NormalizedNativeVariantsOptions} from './options';
 
@@ -12,12 +12,12 @@ export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, 
     options,
   });
 
-  const canonicalConfig = applyCanonicalIdentifiers(
+  const selectedConfig = applySelectedVariantIdentifiers(
     config,
-    normalizedOptions.canonicalVariant,
+    normalizedOptions.selectedVariant,
   );
 
-  return composeNativeVariantMods(canonicalConfig, normalizedOptions);
+  return composeNativeVariantMods(selectedConfig, normalizedOptions);
 };
 
 export {normalizeNativeVariants} from './options';

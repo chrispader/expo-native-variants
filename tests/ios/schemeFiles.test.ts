@@ -45,7 +45,7 @@ describe(syncSchemeFiles, () => {
       platformProjectRoot: directory,
       projectName: 'Acme',
       metadata,
-      options: {canonicalVariant: variant, iosTargets: [], variants: [variant]},
+      options: {selectedVariant: variant, iosTargets: [], variants: [variant]},
     });
 
     await expect(stat(path.join(directory, '.expo-native-variants.json'))).rejects.toMatchObject({
@@ -56,7 +56,7 @@ describe(syncSchemeFiles, () => {
   it('writes a shared scheme and remains idempotent', async () => {
     const directory = await createTemporaryDirectory();
     const options: NormalizedNativeVariantsOptions = {
-      canonicalVariant: variant,
+      selectedVariant: variant,
       iosTargets: [],
       variants: [variant],
     };
@@ -82,7 +82,7 @@ describe(syncSchemeFiles, () => {
   it('removes a scheme after a variant rename', async () => {
     const directory = await createTemporaryDirectory();
     const firstOptions: NormalizedNativeVariantsOptions = {
-      canonicalVariant: variant,
+      selectedVariant: variant,
       iosTargets: [],
       variants: [variant],
     };
@@ -105,7 +105,7 @@ describe(syncSchemeFiles, () => {
       platformProjectRoot: directory,
       projectName: 'Acme',
       metadata,
-      options: {canonicalVariant: renamedVariant, iosTargets: [], variants: [renamedVariant]},
+      options: {selectedVariant: renamedVariant, iosTargets: [], variants: [renamedVariant]},
     });
 
     await expect(readFile(getSchemePath(directory, variant.iosScheme))).rejects.toMatchObject({
@@ -117,7 +117,7 @@ describe(syncSchemeFiles, () => {
   it('refuses to overwrite a modified owned scheme', async () => {
     const directory = await createTemporaryDirectory();
     const options: NormalizedNativeVariantsOptions = {
-      canonicalVariant: variant,
+      selectedVariant: variant,
       iosTargets: [],
       variants: [variant],
     };

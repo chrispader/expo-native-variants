@@ -40,25 +40,15 @@ Use `expo-native-variants` as the package name and `withNativeVariants` as the p
 
 ```json
 {
-  "defaultVariant": "production",
   "variants": {
+    "production": {
+      "applicationId": "com.acme.app"
+    },
     "development": {
-      "displayName": "Acme Dev",
-      "applicationId": "com.acme.app.dev",
-      "urlScheme": "acme-dev",
-      "runMode": "debug"
+      "applicationId": "com.acme.app.dev"
     },
     "preview": {
-      "displayName": "Acme Preview",
-      "applicationId": "com.acme.app.preview",
-      "urlScheme": "acme-preview",
-      "runMode": "release"
-    },
-    "production": {
-      "displayName": "Acme",
-      "applicationId": "com.acme.app",
-      "urlScheme": "acme",
-      "runMode": "release"
+      "applicationId": "com.acme.app.preview"
     }
   }
 }
@@ -66,7 +56,7 @@ Use `expo-native-variants` as the package name and `withNativeVariants` as the p
 
 The keys are user-defined, not limited to these three environments. `applicationId` supplies both platforms, with optional `ios.bundleIdentifier` and `android.applicationId` overrides. An optional `ios.xcodeScheme` can override the generated build-scheme name without confusing it with the deep-link scheme. Android flavor names derive from validated variant keys.
 
-`defaultVariant` supplies the effective canonical variant locally. The optional EAS helper supplies an explicit, validated profile selection instead. The effective canonical variant controls the base Expo identifiers, canonical native scheme, and ordinary Debug/Release configurations. Conflicting identifiers produce an actionable error. Neither selection reduces the set of generated variants.
+The first declared variant supplies the default Expo identifiers and ordinary Debug/Release configurations. The optional plugin `variant` property selects another variant for tools such as EAS. The plugin writes the selected identifiers into app config during config evaluation. Neither selection reduces the set of generated variants.
 
 Keep environment identity separate from build mode. Every variant gets debug and release builds. `runMode` selects the Xcode scheme's Run default, with debug as the default if omitted. It does not remove other build combinations or select an Android task implicitly.
 
@@ -98,11 +88,11 @@ Also exercise Expo CLI with explicit configuration and application selection. Re
 
 ### 2. Establish the package and shared generator contract
 
-Use TypeScript with one normalization and validation stage feeding both platforms. Validate nonempty variants, the default and effective canonical keys, platform identifiers, naming collisions after normalization, duplicate URL schemes, reserved names, and unsafe file names. Reject duplicate effective application identifiers independently on each platform after applying overrides. Keep normalized data immutable and avoid exposing parser-specific objects to the public API.
+Use TypeScript with one normalization and validation stage feeding both platforms. Validate nonempty variants, the optional selected variant key, platform identifiers, naming collisions after normalization, duplicate URL schemes, reserved names, and unsafe file names. Reject duplicate effective application identifiers independently on each platform after applying overrides. Keep normalized data immutable and avoid exposing parser-specific objects to the public API.
 
 Compile the plugin to CommonJS, expose a root `app.plugin.js`, and import plugin APIs through `expo/config-plugins`. Publish type declarations and separate Node configuration code from runtime JavaScript so Metro cannot accidentally import native-project tooling. Declare a bounded Expo compatibility range based on the builds that pass. [Expo plugin development](https://docs.expo.dev/config-plugins/development-and-debugging/)
 
-Use a compact repository layout with `src/options`, `src/android`, `src/ios`, optional `src/runtime` and `src/config` entries, a generated-native example, and focused fixtures. Keep compiled output out of Git and include it in the published package. Example native folders remain ignored; small purpose-built native test fixtures can be committed.
+Use a compact repository layout with `src/options`, `src/android`, `src/ios`, an optional `src/runtime` entry, a generated-native example, and focused fixtures. Keep compiled output out of Git and include it in the published package. Example native folders remain ignored; small purpose-built native test fixtures can be committed.
 
 ### 3. Implement both native generators
 
@@ -128,13 +118,13 @@ Provide an optional pure JavaScript `getNativeVariant` helper that accepts `Appl
 
 ### 5. Prove an explicit EAS integration
 
-Keep local generation independent of environment selection. For EAS only, prototype an app-config helper that validates the selected variant, sets it as the effective canonical variant, and exposes its scalar identifiers before EAS credential preflight while continuing to generate the full native matrix. The same validated selection must reach the native generator so metadata and native aliases agree.
+Keep local generation independent of environment selection. For EAS, pass the optional `variant` plugin property through dynamic app config. The plugin validates the selection and exposes its identifiers before credential preflight while continuing to generate the full native matrix. The same validated selection reaches the native generator so metadata and native aliases agree.
 
 Use a nonsecret variant selector declared in each EAS profile and passed through dynamic app config. Do not rely solely on `EAS_BUILD_PROFILE`: Expo documents that built-in build variables are unavailable during local app-config evaluation. This is a cloud-profile integration detail, not a requirement to change the local shell environment or regenerate native folders when switching locally. [EAS environment availability](https://docs.expo.dev/eas/environment-variables/usage/)
 
-On iOS, test a canonical scheme with ordinary Debug/Release configurations bound to the selected EAS variant while retaining every custom local scheme. Keep the target/product name stable. On Android, select the full flavor task and verify that EAS's preflight identifier matches the resulting artifact. Check that EAS signing configuration does not leak a selected provisioning profile into other variants.
+On iOS, test ordinary Debug/Release configurations bound to the selected EAS variant while retaining every custom local scheme. Keep the target/product name stable. On Android, select the full flavor task and verify that EAS's preflight identifier matches the resulting artifact. Check that EAS signing configuration does not leak a selected provisioning profile into other variants.
 
-Freeze this helper's API only after inspecting the submitted build job and generated project for all profiles. Then verify real simulator/cloud artifacts and a signed device/archive path when credentials are available. Inspection alone does not prove provisioning or successful cloud builds.
+Stabilize EAS support only after inspecting the submitted build job and generated project for all profiles. Then verify real simulator/cloud artifacts and a signed device/archive path when credentials are available. Inspection alone does not prove provisioning or successful cloud builds.
 
 If this approach fails on the supported EAS version, label EAS unsupported for the local-only prerelease and return the concrete limitation for review. Do not silently replace the design with committed native folders, hidden environment switching, or a custom build wrapper. EAS support must be verified before advertising it.
 

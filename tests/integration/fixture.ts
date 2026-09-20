@@ -14,7 +14,7 @@ type IosTargetSettings = Readonly<{
 export type PrebuildSettings = Readonly<{
   neighborPosition: NeighborPosition;
   options: Readonly<{
-    defaultVariant: string;
+    variant: string;
     ios: Readonly<{
       targets: Readonly<Record<string, IosTargetSettings>>;
     }>;
@@ -26,7 +26,7 @@ export function initialSettings(neighborPosition: NeighborPosition): PrebuildSet
   return {
     neighborPosition,
     options: {
-      defaultVariant: 'production',
+      variant: 'production',
       ios: extensionTargets(),
       variants: {
         development: variant('Acme Dev', 'com.acme.app.dev', 'acme-dev', 'debug'),
@@ -41,7 +41,7 @@ export function renamedSettings(neighborPosition: NeighborPosition): PrebuildSet
   return {
     neighborPosition,
     options: {
-      defaultVariant: 'production',
+      variant: 'production',
       ios: extensionTargets(),
       variants: {
         local: variant('Acme Local', 'com.acme.app.local', 'acme-local', 'debug'),

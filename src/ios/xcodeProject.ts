@@ -269,8 +269,8 @@ function reconcileConfigurationList({
   }
 
   if (owner.type !== 'project') {
-    applyVariantSettings(debugSource, options.canonicalVariant, owner);
-    applyVariantSettings(releaseSource, options.canonicalVariant, owner);
+    applyVariantSettings(debugSource, options.selectedVariant, owner);
+    applyVariantSettings(releaseSource, options.selectedVariant, owner);
   }
 }
 

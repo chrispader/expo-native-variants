@@ -10,49 +10,27 @@ See the [validation record](./VALIDATION.md) for tested toolchain versions and r
 
 ## Configure variants
 
-Install `expo-native-variants` in your Expo project and add it to the `plugins` array in your app config. Use complete application identifiers so the variants can be installed together.
+Install `expo-native-variants` in your Expo project and add it to the `plugins` array in your app config. Each variant only requires a complete application identifier. Declare the primary variant first.
 
 ```sh
 bun add expo-native-variants@next
 ```
 
-```json
-{
-  "expo": {
-    "name": "Acme",
-    "slug": "acme",
-    "ios": { "bundleIdentifier": "com.acme.app" },
-    "android": { "package": "com.acme.app" },
-    "plugins": [
-      [
-        "expo-native-variants",
-        {
-          "defaultVariant": "production",
-          "variants": {
-            "development": {
-              "displayName": "Acme Dev",
-              "applicationId": "com.acme.app.dev",
-              "urlScheme": "acme-dev",
-              "runMode": "debug"
-            },
-            "preview": {
-              "displayName": "Acme Preview",
-              "applicationId": "com.acme.app.preview",
-              "urlScheme": "acme-preview",
-              "runMode": "release"
-            },
-            "production": {
-              "displayName": "Acme",
-              "applicationId": "com.acme.app",
-              "urlScheme": "acme",
-              "runMode": "release"
-            }
-          }
-        }
-      ]
-    ]
-  }
-}
+```ts
+import type {ExpoConfig} from 'expo/config';
+import type {NativeVariantMap} from 'expo-native-variants';
+
+export const variants = {
+  production: {applicationId: 'com.acme.app'},
+  development: {applicationId: 'com.acme.app.dev'},
+  preview: {applicationId: 'com.acme.app.preview'},
+} satisfies NativeVariantMap;
+
+export default {
+  name: 'Acme',
+  slug: 'acme',
+  plugins: [['expo-native-variants', {variants}]],
+} satisfies ExpoConfig;
 ```
 
 Run Expo prebuild, then open the generated native projects. Native dependencies and configuration changes require another prebuild. Selecting an existing variant does not.
@@ -79,13 +57,15 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 
 ## Options
 
-`defaultVariant` names the variant used by the ordinary iOS `Debug` and `Release` configurations and the canonical app identity. The base `ios.bundleIdentifier` and `android.package` must match it when supplied. Every variant is generated regardless of the default.
+The first declared variant supplies the Expo application identifiers and the ordinary iOS `Debug` and `Release` configurations. Set the optional plugin `variant` property when a tool such as EAS needs another variant to be selected. The plugin replaces `ios.bundleIdentifier` and `android.package` with the selected identifiers. Every variant is generated regardless of the selection.
+
+`variants` is the only required plugin option. `variant` selects one entry when declaration order is not enough, and `ios.targets` adds extension targets created by another plugin.
 
 | Variant option | Purpose |
 | --- | --- |
-| `displayName` | Name shown under the app icon |
 | `applicationId` | Full identifier shared by iOS and Android |
-| `urlScheme` | Custom URL scheme owned by this variant |
+| `displayName` | Optional name shown under the app icon; defaults to the Expo app name for the first variant and adds the variant name for the others |
+| `urlScheme` | Optional custom URL scheme; defaults to `applicationId` |
 | `runMode` | Xcode Run action's mode, `debug` by default |
 | `ios.bundleIdentifier` | Optional replacement for the shared identifier on iOS |
 | `ios.xcodeScheme` | Optional Xcode build-scheme name |
@@ -96,10 +76,9 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 The plugin can add the variant matrix to extension targets created by another config plugin. List each extension by its exact Xcode target name and give it a bundle identifier suffix:
 
 ```ts
-import type {NativeVariantsConfigInput} from 'expo-native-variants/config';
+import type {NativeVariantsOptions} from 'expo-native-variants';
 
 const options = {
-  defaultVariant: 'production',
   ios: {
     targets: {
       AcmeShare: {bundleIdentifierSuffix: '.share'},
@@ -107,21 +86,17 @@ const options = {
     },
   },
   variants: {
-    development: {
-      displayName: 'Acme Dev',
-      applicationId: 'com.acme.app.dev',
-      urlScheme: 'acme-dev',
-    },
     production: {
-      displayName: 'Acme',
       applicationId: 'com.acme.app',
-      urlScheme: 'acme',
+    },
+    development: {
+      applicationId: 'com.acme.app.dev',
     },
   },
-} satisfies NativeVariantsConfigInput;
+} satisfies NativeVariantsOptions;
 ```
 
-This produces `com.acme.app.dev.share` and `com.acme.app.share` for `AcmeShare`, plus the corresponding widget identifiers. The target-generating plugin remains responsible for creating targets, source files, build phases, frameworks, plist files, and entitlements. Register that plugin before `expo-native-variants`. The `createNativeVariantsConfig` helper already places `expo-native-variants` last.
+This produces `com.acme.app.share` and `com.acme.app.dev.share` for `AcmeShare`, plus the corresponding widget identifiers. The target-generating plugin remains responsible for creating targets, source files, build phases, frameworks, plist files, and entitlements. Register that plugin before `expo-native-variants`, and keep `expo-native-variants` last in the plugin list.
 
 Keep each suffix equal to the suffix in the target generator's own configuration. `expo-native-variants` validates and applies the resulting identifiers but does not rewrite that plugin's configuration.
 
@@ -149,7 +124,7 @@ Install `expo-application` if your app needs runtime variant selection. Keep the
 import * as Application from 'expo-application';
 import { getNativeVariant } from 'expo-native-variants/runtime';
 
-import { variants } from './variants';
+import {variants} from './app.config';
 
 const variant = getNativeVariant(Application.applicationId, variants);
 ```
@@ -178,23 +153,24 @@ The Android development launcher also registers its own fixed `expo-dev-launcher
 
 ## Experimental EAS configuration
 
-EAS reads application identifiers before native generation. The optional config helper projects a selected variant's identifiers into app config and keeps the same selection for the canonical native configurations. It still generates every variant.
+EAS reads application identifiers before native generation. Pass the profile selection through the plugin's optional `variant` property so the plugin projects the matching identifiers during app config evaluation. It still generates every variant.
 
 ```ts
-import { createNativeVariantsConfig } from 'expo-native-variants/config';
-
-import { options } from './variants';
-
-export default () => createNativeVariantsConfig({
-  config: { name: 'Acme', slug: 'acme' },
-  options,
-  variant: process.env.NATIVE_VARIANT,
-});
+export default {
+  name: 'Acme',
+  slug: 'acme',
+  plugins: [
+    ['expo-native-variants', {
+      variant: process.env.NATIVE_VARIANT,
+      variants,
+    }],
+  ],
+} satisfies ExpoConfig;
 ```
 
-Declare `NATIVE_VARIANT` explicitly in each EAS profile's `env` object. Local development can leave it unset and switch between generated native variants as usual. The helper uses `variant`, then `options.canonicalVariant`, then `defaultVariant`. It preserves the app name and existing plugins, registers this plugin last, and rejects duplicate registration. It does not read environment variables itself.
+Declare `NATIVE_VARIANT` explicitly in each EAS profile's `env` object. Local development can leave it unset and switch between generated native variants as usual. When unset, the plugin selects the first declared variant. The plugin does not read environment variables itself.
 
-The [example profiles](./example/eas.json) select Android Gradle tasks and ordinary iOS Debug/Release configurations. Treat them as a starting point. Cloud builds, signing, provisioning, and credential selection have not been verified, so the helper is experimental. Do not rely on the cloud-only `EAS_BUILD_PROFILE` variable for local credential preflight.
+The [example profiles](./example/eas.json) select Android Gradle tasks and ordinary iOS Debug/Release configurations. Treat them as a starting point. Cloud builds, signing, provisioning, and credential selection have not been verified, so EAS support is experimental. Do not rely on the cloud-only `EAS_BUILD_PROFILE` variable for local credential preflight.
 
 ## Compatibility
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import {spawn} from 'node:child_process';
+import {execFile, spawn} from 'node:child_process';
 import {createWriteStream} from 'node:fs';
 import {
   copyFile,
@@ -11,7 +11,9 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {promisify} from 'node:util';
 
+const executeFile = promisify(execFile);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const exampleRoot = path.join(repositoryRoot, 'example');
 const artifactRoot = path.join(repositoryRoot, '.artifacts', 'native');
@@ -288,26 +290,44 @@ async function runLogged({
 }
 
 async function readVariants() {
-  const raw = JSON.parse(
-    await readFile(path.join(exampleRoot, 'variants.json'), 'utf8'),
+  const expoCli = path.join(repositoryRoot, 'node_modules', 'expo', 'bin', 'cli');
+  const {stdout} = await executeFile(
+    process.execPath,
+    [expoCli, 'config', '--json'],
+    {
+      cwd: exampleRoot,
+      env: {...process.env, EXPO_NO_DOTENV: '1'},
+      maxBuffer: 4 * 1024 * 1024,
+    },
   );
-  if (typeof raw !== 'object' || raw === null || typeof raw.variants !== 'object' || raw.variants === null) {
-    throw new Error('example/variants.json does not contain a variants object.');
+  const config = JSON.parse(stdout);
+  const registration = config.plugins?.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-native-variants',
+  );
+  const options = registration?.[1];
+  if (
+    typeof config.name !== 'string' ||
+    typeof options !== 'object' ||
+    options === null ||
+    typeof options.variants !== 'object' ||
+    options.variants === null
+  ) {
+    throw new Error('The example app config does not contain native variant options.');
   }
 
-  return Object.entries(raw.variants).map(([key, value]) => {
+  return Object.entries(options.variants).map(([key, value], index) => {
     if (
       typeof value !== 'object' ||
       value === null ||
-      typeof value.applicationId !== 'string' ||
-      typeof value.displayName !== 'string'
+      typeof value.applicationId !== 'string'
     ) {
       throw new Error(`Variant ${JSON.stringify(key)} is missing native build metadata.`);
     }
     const configurationLabel = toPascalConfigLabel(key);
     return {
       key,
-      displayName: value.displayName,
+      displayName:
+        value.displayName ?? (index === 0 ? config.name : `${config.name} ${configurationLabel}`),
       androidApplicationId: value.android?.applicationId ?? value.applicationId,
       androidFlavor: lowerFirst(configurationLabel),
       iosBundleIdentifier: value.ios?.bundleIdentifier ?? value.applicationId,

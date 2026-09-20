@@ -23,7 +23,7 @@ const development = {
 
 const options: NormalizedNativeVariantsOptions = {
   iosTargets: [],
-  canonicalVariant: development,
+  selectedVariant: development,
   variants: [development],
 };
 

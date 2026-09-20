@@ -30,7 +30,7 @@ const production = {
 };
 
 const options: NormalizedNativeVariantsOptions = {
-  canonicalVariant: production,
+  selectedVariant: production,
   iosTargets: [],
   variants: [development, production],
 };
@@ -72,7 +72,7 @@ describe(updateXcodeProject, () => {
     });
   });
 
-  it('maps base Debug and Release to the canonical variant', () => {
+  it('maps base Debug and Release to the selected variant', () => {
     const fixture = createProjectFixture();
     updateXcodeProject(fixture.project, options);
 
@@ -108,7 +108,7 @@ describe(updateXcodeProject, () => {
     const fixture = createProjectFixture();
     updateXcodeProject(fixture.project, options);
     const productionOnly = {
-      canonicalVariant: production,
+      selectedVariant: production,
       iosTargets: [],
       variants: [production],
     };

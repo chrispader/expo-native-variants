@@ -18,9 +18,9 @@ export type NativeVariantsIosOptions = Readonly<{
 }>;
 
 export type NativeVariantOptions = Readonly<{
-  displayName: string;
   applicationId: string;
-  urlScheme: string;
+  displayName?: string;
+  urlScheme?: string;
   runMode?: NativeVariantRunMode;
   ios?: NativeVariantIosOptions;
   android?: NativeVariantAndroidOptions;
@@ -29,8 +29,7 @@ export type NativeVariantOptions = Readonly<{
 export type NativeVariantMap = Readonly<Record<string, NativeVariantOptions>>;
 
 export type NativeVariantsOptions = Readonly<{
-  defaultVariant: string;
-  canonicalVariant?: string;
+  variant?: string | undefined;
   ios?: NativeVariantsIosOptions;
   variants: NativeVariantMap;
 }>;
@@ -55,12 +54,11 @@ export type NormalizedNativeVariantsIosTarget = Readonly<{
 
 export type NormalizedNativeVariantsOptions = Readonly<{
   variants: readonly NormalizedNativeVariant[];
-  canonicalVariant: NormalizedNativeVariant;
+  selectedVariant: NormalizedNativeVariant;
   iosTargets: readonly NormalizedNativeVariantsIosTarget[];
 }>;
 
 export type NormalizeNativeVariantsArgs = Readonly<{
   configName: string;
   options: unknown;
-  canonicalVariant?: string;
 }>;
