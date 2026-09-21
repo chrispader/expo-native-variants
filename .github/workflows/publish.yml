@@ -4,6 +4,12 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing version tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,13 +22,13 @@ jobs:
     timeout-minutes: 20
     env:
       CI: true
-      NPM_DIST_TAG: ${{ github.event.release.prerelease && 'next' || 'latest' }}
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      NPM_DIST_TAG: ${{ contains(github.event.release.tag_name || inputs.release_tag, '-') && 'next' || 'latest' }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
