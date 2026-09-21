@@ -52,8 +52,8 @@ jobs:
         run: |
           bun run test
           bun run typecheck
-          bun run typecheck:example
           bun run verify:package
+          bun run typecheck:example
 
       - name: Publish package
         run: npm publish --access public --tag "$NPM_DIST_TAG"
