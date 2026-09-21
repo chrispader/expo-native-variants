@@ -1,6 +1,6 @@
 # Validation record
 
-This records checks performed on September 19 and 20, 2026 for the published `0.1.0` release.
+This records checks performed from September 19 through 21, 2026 for the published `0.1.0` release and the `0.2.0-alpha.0` prerelease.
 
 ## Build environment
 

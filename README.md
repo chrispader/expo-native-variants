@@ -2,7 +2,7 @@
 
 Generate every native app variant in one Expo prebuild. Switch between development, preview, and production in Xcode or Android Studio while keeping `ios/` and `android/` generated and ignored by Git.
 
-The first stable release is available as `0.1.0` under the `latest` tag.
+The simplified configuration API is available as the `0.2.0-alpha.0` prerelease under the `next` tag. The `latest` tag remains on `0.1.0` while the new API is tested in consumer apps.
 
 This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 

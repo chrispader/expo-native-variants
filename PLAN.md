@@ -2,7 +2,7 @@
 
 Expo's usual variant setup regenerates the native project for the selected environment. This package will generate every configured variant together, so developers can switch schemes or flavors while keeping `ios/` and `android/` generated and ignored by Git.
 
-Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub, and `0.1.0` is published under the npm `latest` tag. The repository uses Bun for package management.
+Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub. Version `0.1.0` is published under the npm `latest` tag, and `0.2.0-alpha.0` is published under `next`. The repository uses Bun for package management.
 
 ## Viability and support boundary
 
@@ -146,7 +146,7 @@ Use a public `chrispader/expo-native-variants` repository and the unscoped npm n
 
 Propose the MIT license, a README showing the supported native workflows, a compatibility table, limitations, a working example, and contribution/release guidance. Use conventional commits and attempt signing with the configured key. Keep the initial branch focused on the package.
 
-The source is public and `0.1.0` is published under the `latest` tag. The matching GitHub release records the first stable implementation.
+The source is public. Version `0.1.0` is published under the `latest` tag, and `0.2.0-alpha.0` is published under `next`. Matching GitHub releases record both versions.
 
 Use GitHub Actions trusted publishing with OIDC and provenance for subsequent releases. Account ownership, initial package bootstrap, any required two-factor challenge, and the trusted-publisher connection must be completed using the actual account at release time. Do not assume credentials or an existing publisher connection. [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 
