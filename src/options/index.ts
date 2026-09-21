@@ -1,5 +1,7 @@
 export {normalizeNativeVariants} from './normalize';
 export type {
+  NativeVariantAdaptiveIcon,
+  NativeVariantIosIcon,
   NativeVariantAndroidOptions,
   NativeVariantIosOptions,
   NativeVariantMap,

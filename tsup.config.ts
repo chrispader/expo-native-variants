@@ -4,7 +4,6 @@ export default defineConfig({
   clean: true,
   dts: true,
   entry: {
-    'config/index': 'src/config/index.ts',
     index: 'src/index.ts',
     'runtime/index': 'src/runtime/index.ts',
   },

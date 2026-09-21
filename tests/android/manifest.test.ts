@@ -54,6 +54,27 @@ describe('reconcileAndroidManifest', () => {
         ]);
     });
 
+    it('handles Expo appending the selected and auxiliary schemes to its generated filter', () => {
+        const filter = createUrlFilter('${nativeVariantScheme}');
+        filter.data?.push(
+            {$: {'android:scheme': '${applicationId}'}},
+            {$: {'android:scheme': 'acme'}},
+            {$: {'android:scheme': 'oauth-callback'}},
+        );
+        const result = reconcileAndroidManifest(createManifest([filter]), {
+            fallbackSchemes: new Set(['acme']),
+        });
+        expect(readSchemes(getMainActivityFilters(result.manifest))).toEqual([
+            'oauth-callback', '${nativeVariantScheme}', '${applicationId}',
+        ]);
+    });
+
+    it('still refuses compound data added to a managed filter', () => {
+        const filter = createUrlFilter('${nativeVariantScheme}');
+        filter.data?.push({$: {'android:scheme': '${applicationId}'}}, {$: {'android:host': 'example.com'}});
+        expect(() => reconcileAndroidManifest(createManifest([filter]), {fallbackSchemes: new Set()})).toThrow('does not own');
+    });
+
     it('rejects scheme-dependent data that cannot be separated safely', () => {
         const filter = createUrlFilter('acme');
         filter.data?.push({$: {'android:host': 'callback.example.com'}});

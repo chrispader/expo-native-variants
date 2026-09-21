@@ -5,6 +5,7 @@ type VariantSettings = Readonly<{
   displayName: string;
   runMode: 'debug' | 'release';
   urlScheme: string;
+  icon: string;
 }>;
 
 type IosTargetSettings = Readonly<{
@@ -14,7 +15,7 @@ type IosTargetSettings = Readonly<{
 export type PrebuildSettings = Readonly<{
   neighborPosition: NeighborPosition;
   options: Readonly<{
-    defaultVariant: string;
+    variant: string;
     ios: Readonly<{
       targets: Readonly<Record<string, IosTargetSettings>>;
     }>;
@@ -26,7 +27,7 @@ export function initialSettings(neighborPosition: NeighborPosition): PrebuildSet
   return {
     neighborPosition,
     options: {
-      defaultVariant: 'production',
+      variant: 'production',
       ios: extensionTargets(),
       variants: {
         development: variant('Acme Dev', 'com.acme.app.dev', 'acme-dev', 'debug'),
@@ -41,7 +42,7 @@ export function renamedSettings(neighborPosition: NeighborPosition): PrebuildSet
   return {
     neighborPosition,
     options: {
-      defaultVariant: 'production',
+      variant: 'production',
       ios: extensionTargets(),
       variants: {
         local: variant('Acme Local', 'com.acme.app.local', 'acme-local', 'debug'),
@@ -65,7 +66,8 @@ function variant(
   urlScheme: string,
   runMode: 'debug' | 'release',
 ): VariantSettings {
-  return {applicationId, displayName, runMode, urlScheme};
+  const icon = runMode === 'debug' ? './icons/development.png' : './icons/production.png';
+  return {applicationId, displayName, runMode, urlScheme, icon};
 }
 
 export const CONSUMER_PACKAGE = {

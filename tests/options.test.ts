@@ -27,7 +27,7 @@ describe('normalizeNativeVariants', () => {
   it('normalizes every configured variant and its generated names', () => {
     const result = normalizeNativeVariants({
       configName: 'Acme',
-      options: {defaultVariant: 'production', variants},
+      options: {variant: 'production', variants},
     });
 
     expect(result.variants).toEqual([
@@ -69,17 +69,41 @@ describe('normalizeNativeVariants', () => {
       },
     ]);
     expect(result.iosTargets).toEqual([]);
-    expect(result.canonicalVariant).toBe(result.variants[2]);
+    expect(result.selectedVariant).toBe(result.variants[2]);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.variants)).toBe(true);
     expect(result.variants.every(Object.isFrozen)).toBe(true);
+  });
+
+  it('uses the first variant and derives optional display metadata', () => {
+    const result = normalizeNativeVariants({
+      configName: 'Acme',
+      options: {
+        variants: {
+          production: {applicationId: 'com.acme.app'},
+          development: {applicationId: 'com.acme.app.dev'},
+        },
+      },
+    });
+
+    expect(result.selectedVariant.key).toBe('production');
+    expect(result.variants).toMatchObject([
+      {
+        displayName: 'Acme',
+        urlScheme: 'com.acme.app',
+      },
+      {
+        displayName: 'Acme Development',
+        urlScheme: 'com.acme.app.dev',
+      },
+    ]);
   });
 
   it('normalizes configured iOS extension targets', () => {
     const result = normalizeNativeVariants({
       configName: 'Acme',
       options: {
-        defaultVariant: 'production',
+        variant: 'production',
         ios: {
           targets: {
             AcmeShare: {bundleIdentifierSuffix: '.share'},
@@ -100,7 +124,7 @@ describe('normalizeNativeVariants', () => {
     const result = normalizeNativeVariants({
       configName: 'Acme',
       options: {
-        defaultVariant: 'development',
+        variant: 'development',
         variants: {
           development: {
             android: {applicationId: 'com.acme.android.dev'},
@@ -116,35 +140,24 @@ describe('normalizeNativeVariants', () => {
       },
     });
 
-    expect(result.canonicalVariant).toMatchObject({
+    expect(result.selectedVariant).toMatchObject({
       androidApplicationId: 'com.acme.android.dev',
       iosBundleIdentifier: 'com.acme.ios-dev',
       iosScheme: 'Acme Dev Local',
     });
   });
 
-  it('uses canonical selection without reducing the generated matrix', () => {
-    const fromOptions = normalizeNativeVariants({
+  it('uses explicit selection without reducing the generated matrix', () => {
+    const selected = normalizeNativeVariants({
       configName: 'Acme',
       options: {
-        canonicalVariant: 'preview',
-        defaultVariant: 'production',
-        variants,
-      },
-    });
-    const fromOverride = normalizeNativeVariants({
-      canonicalVariant: 'development',
-      configName: 'Acme',
-      options: {
-        canonicalVariant: 'preview',
-        defaultVariant: 'production',
+        variant: 'preview',
         variants,
       },
     });
 
-    expect(fromOptions.canonicalVariant.key).toBe('preview');
-    expect(fromOverride.canonicalVariant.key).toBe('development');
-    expect(fromOverride.variants.map(({key}) => key)).toEqual([
+    expect(selected.selectedVariant.key).toBe('preview');
+    expect(selected.variants.map(({key}) => key)).toEqual([
       'development',
       'preview',
       'production',
@@ -152,14 +165,14 @@ describe('normalizeNativeVariants', () => {
   });
 
   it.each([
-    [{defaultVariant: 'production', variants, extra: true}, 'Plugin options'],
+    [{variant: 'production', variants, extra: true}, 'Plugin options'],
     [
-      {defaultVariant: 'production', ios: {extra: true}, variants},
+      {variant: 'production', ios: {extra: true}, variants},
       'Plugin options ios',
     ],
     [
       {
-        defaultVariant: 'production',
+        variant: 'production',
         ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.share', extra: true}}},
         variants,
       },
@@ -167,7 +180,7 @@ describe('normalizeNativeVariants', () => {
     ],
     [
       {
-        defaultVariant: 'production',
+        variant: 'production',
         variants: {
           production: {...variants.production, extra: true},
         },
@@ -176,7 +189,7 @@ describe('normalizeNativeVariants', () => {
     ],
     [
       {
-        defaultVariant: 'production',
+        variant: 'production',
         variants: {
           production: {...variants.production, ios: {extra: true}},
         },
@@ -185,7 +198,7 @@ describe('normalizeNativeVariants', () => {
     ],
     [
       {
-        defaultVariant: 'production',
+        variant: 'production',
         variants: {
           production: {...variants.production, android: {extra: true}},
         },
@@ -199,13 +212,9 @@ describe('normalizeNativeVariants', () => {
   });
 
   it.each([
-    [{defaultVariant: 'production', variants: {}}, 'at least one'],
-    [{defaultVariant: 'missing', variants}, 'defaultVariant references unknown'],
-    [
-      {canonicalVariant: 'missing', defaultVariant: 'production', variants},
-      'canonicalVariant references unknown',
-    ],
-    [{defaultVariant: '', variants}, 'defaultVariant must be a nonempty'],
+    [{variant: 'production', variants: {}}, 'at least one'],
+    [{variant: 'missing', variants}, 'variant references unknown'],
+    [{variant: '', variants}, 'variant must be a nonempty'],
   ])('rejects empty or unknown variant selections', (options, message) => {
     expect(() => normalizeNativeVariants({configName: 'Acme', options})).toThrow(message);
   });
@@ -219,7 +228,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'production',
+          variant: 'production',
           ios: {targets: {AcmeShare: {bundleIdentifierSuffix}}},
           variants,
         },
@@ -232,7 +241,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'production',
+          variant: 'production',
           ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.dev'}}},
           variants,
         },
@@ -245,7 +254,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'one',
+          variant: 'one',
           variants: {
             one: {
               ...variants.development,
@@ -266,7 +275,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'one',
+          variant: 'one',
           variants: {
             one: {
               ...variants.development,
@@ -289,7 +298,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'one',
+          variant: 'one',
           variants: {
             one: {...variants.development, urlScheme: 'acme-shared'},
             two: {...variants.preview, urlScheme: 'ACME-SHARED'},
@@ -304,7 +313,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'one',
+          variant: 'one',
           variants: {
             one: {
               ...variants.development,
@@ -327,7 +336,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'one',
+          variant: 'one',
           variants: {
             one: {
               ...variants.development,
@@ -350,7 +359,7 @@ describe('normalizeNativeVariants', () => {
     const result = normalizeNativeVariants({
       configName: 'Acme',
       options: {
-        defaultVariant: 'production',
+        variant: 'production',
         variants: {
           production: {
             ...variants.production,
@@ -360,7 +369,7 @@ describe('normalizeNativeVariants', () => {
       },
     });
 
-    expect(result.canonicalVariant.urlScheme).toBe('com.acme.app');
+    expect(result.selectedVariant.urlScheme).toBe('com.acme.app');
   });
 
   it.each([
@@ -374,7 +383,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: firstKey,
+          variant: firstKey,
           variants: {
             [firstKey]: {...variants.development, urlScheme: 'first'},
             [secondKey]: {...variants.preview, urlScheme: 'second'},
@@ -391,7 +400,7 @@ describe('normalizeNativeVariants', () => {
         normalizeNativeVariants({
           configName: 'Acme',
           options: {
-            defaultVariant: key,
+            variant: key,
             variants: {[key]: variants.development},
           },
         }),
@@ -406,7 +415,7 @@ describe('normalizeNativeVariants', () => {
         normalizeNativeVariants({
           configName: 'Acme',
           options: {
-            defaultVariant: key,
+            variant: key,
             variants: {[key]: variants.development},
           },
         }),
@@ -420,7 +429,7 @@ describe('normalizeNativeVariants', () => {
       expect(() =>
         normalizeNativeVariants({
           configName,
-          options: {defaultVariant: 'production', variants},
+          options: {variant: 'production', variants},
         }),
       ).toThrow('path-safe');
     },
@@ -431,7 +440,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'production',
+          variant: 'production',
           variants: {
             production: {
               ...variants.production,
@@ -457,7 +466,7 @@ describe('normalizeNativeVariants', () => {
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          defaultVariant: 'production',
+          variant: 'production',
           variants: {production: variant},
         },
       }),

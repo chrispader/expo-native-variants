@@ -5,7 +5,7 @@ import {updatePodfile} from '../../src/ios/podfile';
 
 const options: NormalizedNativeVariantsOptions = {
   iosTargets: [],
-  canonicalVariant: {
+  selectedVariant: {
     key: 'production',
     displayName: 'Acme',
     iosBundleIdentifier: 'com.acme.app',

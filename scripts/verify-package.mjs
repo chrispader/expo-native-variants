@@ -21,9 +21,6 @@ const requiredPublishedFiles = [
   'LICENSE',
   'README.md',
   'app.plugin.js',
-  'dist/config/index.d.ts',
-  'dist/config/index.js',
-  'dist/config/index.mjs',
   'dist/index.d.ts',
   'dist/index.js',
   'dist/index.mjs',
@@ -127,6 +124,7 @@ async function extractIntoConsumer(temporaryRoot, artifactPath) {
     {maxBuffer: 4 * 1024 * 1024},
   );
   await Promise.all([
+    linkDependency(nodeModules, '@expo/image-utils'),
     linkDependency(nodeModules, 'expo'),
     linkDependency(nodeModules, 'react'),
     linkDependency(nodeModules, 'react-native'),
@@ -142,6 +140,7 @@ async function extractIntoConsumer(temporaryRoot, artifactPath) {
 }
 
 async function linkDependency(nodeModules, dependency) {
+  await mkdir(path.dirname(path.join(nodeModules, dependency)), {recursive: true});
   await symlink(
     path.join(repositoryRoot, 'node_modules', dependency),
     path.join(nodeModules, dependency),
@@ -182,16 +181,9 @@ function verifyPackageMetadata(packageJson) {
     './dist/index.mjs',
     'root ESM export',
   );
-  assertEqual(
-    packageJson.exports?.['./config']?.import,
-    './dist/config/index.mjs',
-    'config ESM export',
-  );
-  assertEqual(
-    packageJson.exports?.['./config']?.require,
-    './dist/config/index.js',
-    'config CommonJS export',
-  );
+  if (packageJson.exports?.['./config'] !== undefined) {
+    throw new Error('The package still exports the removed config wrapper.');
+  }
   assertEqual(
     packageJson.exports?.['./runtime']?.import,
     './dist/runtime/index.mjs',
@@ -239,11 +231,6 @@ async function verifyConsumerResolution(consumerRoot) {
     }) !== 'production'
   ) {
     throw new Error('The packed runtime export does not resolve a variant.');
-  }
-
-  const config = consumerRequire('expo-native-variants/config');
-  if (typeof config.createNativeVariantsConfig !== 'function') {
-    throw new Error('The packed config entry does not export its helper.');
   }
 
   await executeFile(
@@ -343,14 +330,10 @@ async function verifyMetroBundle(consumerRoot) {
 
 const ESM_CONSUMER_CHECK = `
 import plugin, {withNativeVariants} from 'expo-native-variants';
-import {createNativeVariantsConfig} from 'expo-native-variants/config';
 import {getNativeVariant} from 'expo-native-variants/runtime';
 
 if (typeof plugin !== 'function' || plugin !== withNativeVariants) {
   throw new Error('Root ESM default export is not the config plugin function.');
-}
-if (typeof createNativeVariantsConfig !== 'function') {
-  throw new Error('Config ESM named export is unavailable.');
 }
 if (getNativeVariant('com.acme.app', {production: {applicationId: 'com.acme.app'}}) !== 'production') {
   throw new Error('Runtime ESM named export did not resolve a variant.');
@@ -378,19 +361,12 @@ module.exports = {
   version: '1.0.0',
   plugins: [
     ['expo-native-variants', {
-      defaultVariant: 'production',
       variants: {
-        development: {
-          applicationId: 'com.acme.packed.dev',
-          displayName: 'Packed Dev',
-          runMode: 'debug',
-          urlScheme: 'packed-dev',
-        },
         production: {
           applicationId: 'com.acme.packed',
-          displayName: 'Packed',
-          runMode: 'release',
-          urlScheme: 'packed',
+        },
+        development: {
+          applicationId: 'com.acme.packed.dev',
         },
       },
     }],
@@ -413,7 +389,6 @@ async function verifyRuntimeIsolation(packageRoot) {
   );
   for (const forbiddenImport of [
     'config/index',
-    'createNativeVariantsConfig',
     'expo/config-plugins',
     'src/options',
     '../options',

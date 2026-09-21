@@ -29,12 +29,6 @@
       "require": "./dist/runtime/index.js",
       "default": "./dist/runtime/index.mjs"
     },
-    "./config": {
-      "types": "./dist/config/index.d.ts",
-      "import": "./dist/config/index.mjs",
-      "require": "./dist/config/index.js",
-      "default": "./dist/config/index.mjs"
-    },
     "./app.plugin.js": "./app.plugin.js",
     "./package.json": "./package.json"
   },
@@ -66,10 +60,14 @@
     "@bacons/apple-targets": "5.0.0",
     "@types/node": "^24.5.2",
     "expo": "57.0.24",
+    "expo-linking": "~57.0.10",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@expo/image-utils": "^0.8.17"
   }
 }

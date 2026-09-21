@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import {spawn} from 'node:child_process';
+import {execFile, spawn} from 'node:child_process';
 import {createWriteStream} from 'node:fs';
 import {
   copyFile,
@@ -11,7 +11,9 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {promisify} from 'node:util';
 
+const executeFile = promisify(execFile);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const exampleRoot = path.join(repositoryRoot, 'example');
 const artifactRoot = path.join(repositoryRoot, '.artifacts', 'native');
@@ -105,6 +107,8 @@ async function collectAndroidArtifact({variant, mode, variantName}) {
   }
   const apkPath = path.join(outputDirectory, outputFile);
   await requireFile(apkPath, `${variantName} did not produce ${outputFile}.`);
+  const {stdout: embeddedConfig} = await executeFile('unzip', ['-p', apkPath, 'assets/app.config']);
+  verifyEmbeddedConfig(JSON.parse(embeddedConfig), variant, variantName);
   const destination = path.join(
     artifactRoot,
     'android',
@@ -133,7 +137,7 @@ async function buildIos() {
 
   for (const variant of variants) {
     for (const mode of ['debug', 'release']) {
-      const configuration = `${capitalize(mode)}-${variant.configurationLabel}`;
+      const configuration = mode === 'debug' ? variant.debugConfiguration : variant.releaseConfiguration;
       const scheme = variant.iosScheme ?? `${projectName}-${variant.configurationLabel}`;
       const buildName = `${variant.key}-${mode}`;
       const logPath = path.join(artifactRoot, 'logs', 'ios', `${buildName}.log`);
@@ -198,9 +202,14 @@ async function collectIosArtifact({
   await requireDirectory(appPath, `${configuration} did not produce ${projectName}.app.`);
 
   const infoPlistPath = path.join(appPath, 'Info.plist');
+  verifyEmbeddedConfig(
+    JSON.parse(await readFile(path.join(appPath, 'EXConstants.bundle', 'app.config'), 'utf8')),
+    variant,
+    configuration,
+  );
   await verifyBundleMode({
     bundlePath: path.join(appPath, 'main.jsbundle'),
-    mode: configuration.startsWith('Debug-') ? 'debug' : 'release',
+    mode: configuration === variant.debugConfiguration ? 'debug' : 'release',
     label: `iOS ${configuration}`,
   });
   const applicationId = await readPlistValue(infoPlistPath, 'CFBundleIdentifier');
@@ -288,33 +297,65 @@ async function runLogged({
 }
 
 async function readVariants() {
-  const raw = JSON.parse(
-    await readFile(path.join(exampleRoot, 'variants.json'), 'utf8'),
+  const expoCli = path.join(repositoryRoot, 'node_modules', 'expo', 'bin', 'cli');
+  const {stdout} = await executeFile(
+    process.execPath,
+    [expoCli, 'config', '--json'],
+    {
+      cwd: exampleRoot,
+      env: {...process.env, EXPO_NO_DOTENV: '1'},
+      maxBuffer: 4 * 1024 * 1024,
+    },
   );
-  if (typeof raw !== 'object' || raw === null || typeof raw.variants !== 'object' || raw.variants === null) {
-    throw new Error('example/variants.json does not contain a variants object.');
+  const config = JSON.parse(stdout);
+  const registration = config.plugins?.find(
+    (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-native-variants',
+  );
+  const options = registration?.[1];
+  if (
+    typeof config.name !== 'string' ||
+    typeof options !== 'object' ||
+    options === null ||
+    typeof options.variants !== 'object' ||
+    options.variants === null
+  ) {
+    throw new Error('The example app config does not contain native variant options.');
   }
 
-  return Object.entries(raw.variants).map(([key, value]) => {
+  return Object.entries(options.variants).map(([key, value], index) => {
     if (
       typeof value !== 'object' ||
       value === null ||
-      typeof value.applicationId !== 'string' ||
-      typeof value.displayName !== 'string'
+      typeof value.applicationId !== 'string'
     ) {
       throw new Error(`Variant ${JSON.stringify(key)} is missing native build metadata.`);
     }
     const configurationLabel = toPascalConfigLabel(key);
     return {
       key,
-      displayName: value.displayName,
+      displayName:
+        value.displayName ?? (index === 0 ? config.name : `${config.name} ${configurationLabel}`),
       androidApplicationId: value.android?.applicationId ?? value.applicationId,
-      androidFlavor: lowerFirst(configurationLabel),
+      urlScheme: value.urlScheme ?? value.applicationId,
+      androidFlavor: value.android?.flavor ?? lowerFirst(configurationLabel),
+      debugConfiguration: value.ios?.debugConfiguration ?? `Debug-${configurationLabel}`,
+      releaseConfiguration: value.ios?.releaseConfiguration ?? `Release-${configurationLabel}`,
       iosBundleIdentifier: value.ios?.bundleIdentifier ?? value.applicationId,
       iosScheme: value.ios?.xcodeScheme,
       configurationLabel,
     };
   });
+}
+
+function verifyEmbeddedConfig(config, variant, label) {
+  const scheme = Array.isArray(config.scheme) ? config.scheme[0] : config.scheme;
+  if (
+    scheme !== variant.urlScheme ||
+    config.android?.package !== variant.androidApplicationId ||
+    config.ios?.bundleIdentifier !== variant.iosBundleIdentifier
+  ) {
+    throw new Error(`${label} embedded Expo config for the wrong variant.`);
+  }
 }
 
 async function requireDirectory(directory, message) {

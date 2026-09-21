@@ -9,7 +9,7 @@ import type {NormalizedNativeVariantsOptions} from '../../src/options';
 
 const OPTIONS: NormalizedNativeVariantsOptions = {
     iosTargets: [],
-    canonicalVariant: {
+    selectedVariant: {
         androidApplicationId: 'com.acme.app',
         androidFlavor: 'production',
         debugConfiguration: 'Debug-Production',

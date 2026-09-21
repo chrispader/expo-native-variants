@@ -8,6 +8,8 @@ import {
   URL_SCHEME_BUILD_SETTING,
 } from './infoPlist';
 
+import {applyIosIconBuildSettings} from '../icons/resolve';
+
 const MANAGED_BUILD_SETTING = 'EXPO_NATIVE_VARIANTS_MANAGED';
 const APPLICATION_IDENTIFIER_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER';
 const VARIANT_KEY_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_KEY';
@@ -269,8 +271,8 @@ function reconcileConfigurationList({
   }
 
   if (owner.type !== 'project') {
-    applyVariantSettings(debugSource, options.canonicalVariant, owner);
-    applyVariantSettings(releaseSource, options.canonicalVariant, owner);
+    applyVariantSettings(debugSource, options.selectedVariant, owner);
+    applyVariantSettings(releaseSource, options.selectedVariant, owner);
   }
 }
 
@@ -419,6 +421,7 @@ function applyVariantSettings(
   variant: NormalizedNativeVariant,
   owner: Exclude<ConfigurationOwner, Readonly<{type: 'project'}>>,
 ): void {
+  configuration.buildSettings[VARIANT_KEY_BUILD_SETTING] = quote(variant.key);
   configuration.buildSettings[APPLICATION_IDENTIFIER_BUILD_SETTING] = quote(
     variant.iosBundleIdentifier,
   );
@@ -432,6 +435,7 @@ function applyVariantSettings(
   if (owner.type === 'application') {
     configuration.buildSettings[DISPLAY_NAME_BUILD_SETTING] = quote(variant.displayName);
     configuration.buildSettings[URL_SCHEME_BUILD_SETTING] = quote(variant.urlScheme);
+    applyIosIconBuildSettings(configuration.buildSettings, variant);
   } else {
     delete configuration.buildSettings[DISPLAY_NAME_BUILD_SETTING];
     delete configuration.buildSettings[URL_SCHEME_BUILD_SETTING];

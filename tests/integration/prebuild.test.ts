@@ -1,11 +1,22 @@
 import {execFile} from 'node:child_process';
-import {cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile} from 'node:fs/promises';
+import {
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
+import {EXPO_CONFIG_COMMAND} from '../../src/android/expoConfig';
 
 import {
   APP_CONFIG,
@@ -19,11 +30,7 @@ import {
 import type {PrebuildSettings} from './fixture';
 
 const executeFile = promisify(execFile);
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-);
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const expoCli = path.join(repositoryRoot, 'node_modules', 'expo', 'bin', 'cli');
 
 let consumerRoot = '';
@@ -51,6 +58,39 @@ describe('compiled package prebuild', () => {
     await runPrebuild(consumerRoot, true);
     await assertRenamedNativeProject(consumerRoot);
   });
+
+  it('updates schemes and owned icons during non-clean prebuild without extension plugins', async () => {
+    await writeFile(
+      path.join(consumerRoot, 'app.config.js'),
+      `
+      const {ios, ...options} = require('./variant-settings.json').options;
+      module.exports = {name: 'Acme', slug: 'acme', plugins: [['expo-native-variants', options]]};
+    `,
+    );
+    await writeSettings(consumerRoot, initialSettings('before'));
+    await runPrebuild(consumerRoot, true);
+    await runPrebuild(consumerRoot, false);
+    await writeSettings(consumerRoot, renamedSettings('before'));
+    await runPrebuild(consumerRoot, false);
+    const catalog = path.join(consumerRoot, 'ios/Acme/Images.xcassets');
+    await expect(
+      pathExists(path.join(catalog, 'NativeVariantdevelopment.appiconset')),
+    ).resolves.toBe(false);
+    await expect(
+      pathExists(path.join(catalog, 'NativeVariantlocal.appiconset/light.png')),
+    ).resolves.toBe(true);
+    await expect(pathExists(path.join(consumerRoot, 'android/app/src/development'))).resolves.toBe(
+      false,
+    );
+    await expect(
+      pathExists(path.join(consumerRoot, 'android/app/src/local/res/mipmap-mdpi/ic_launcher.png')),
+    ).resolves.toBe(true);
+    const manifest = await readFile(
+      path.join(consumerRoot, 'android/app/src/main/AndroidManifest.xml'),
+      'utf8',
+    );
+    expect(count(manifest, '${nativeVariantScheme}')).toBe(1);
+  });
 });
 
 async function createConsumer(): Promise<string> {
@@ -61,6 +101,8 @@ async function createConsumer(): Promise<string> {
   await mkdir(shareTarget, {recursive: true});
   await Promise.all([
     linkDependency(nodeModules, '@bacons/apple-targets'),
+    linkDependency(nodeModules, '@expo/image-utils'),
+    linkDependency(nodeModules, 'expo-constants'),
     linkDependency(nodeModules, 'expo'),
     linkDependency(nodeModules, 'react'),
     linkDependency(nodeModules, 'react-native'),
@@ -68,18 +110,13 @@ async function createConsumer(): Promise<string> {
   ]);
   await Promise.all([
     writeFile(path.join(root, 'index.js'), '', 'utf8'),
+    cp(path.join(repositoryRoot, 'example/assets/icons'), path.join(root, 'icons'), {
+      recursive: true,
+    }),
     writeFile(path.join(root, 'app.config.js'), APP_CONFIG, 'utf8'),
     writeFile(path.join(root, 'neighbor-plugin.js'), NEIGHBOR_PLUGIN, 'utf8'),
-    writeFile(
-      path.join(shareTarget, 'expo-target.config.js'),
-      APPLE_TARGET_CONFIG,
-      'utf8',
-    ),
-    writeFile(
-      path.join(shareTarget, 'ShareViewController.swift'),
-      SHARE_VIEW_CONTROLLER,
-      'utf8',
-    ),
+    writeFile(path.join(shareTarget, 'expo-target.config.js'), APPLE_TARGET_CONFIG, 'utf8'),
+    writeFile(path.join(shareTarget, 'ShareViewController.swift'), SHARE_VIEW_CONTROLLER, 'utf8'),
     writeFile(
       path.join(root, 'package.json'),
       `${JSON.stringify(CONSUMER_PACKAGE, null, 2)}\n`,
@@ -95,10 +132,7 @@ async function copyCompiledPackage(nodeModules: string): Promise<void> {
   await cp(path.join(repositoryRoot, 'dist'), path.join(destination, 'dist'), {
     recursive: true,
   });
-  await cp(
-    path.join(repositoryRoot, 'app.plugin.js'),
-    path.join(destination, 'app.plugin.js'),
-  );
+  await cp(path.join(repositoryRoot, 'app.plugin.js'), path.join(destination, 'app.plugin.js'));
   await cp(path.join(repositoryRoot, 'package.json'), path.join(destination, 'package.json'));
   await lstat(path.join(destination, 'dist', 'index.js'));
 }
@@ -106,11 +140,7 @@ async function copyCompiledPackage(nodeModules: string): Promise<void> {
 async function linkDependency(nodeModules: string, dependency: string): Promise<void> {
   const destination = path.join(nodeModules, dependency);
   await mkdir(path.dirname(destination), {recursive: true});
-  await symlink(
-    path.join(repositoryRoot, 'node_modules', dependency),
-    destination,
-    'dir',
-  );
+  await symlink(path.join(repositoryRoot, 'node_modules', dependency), destination, 'dir');
 }
 
 async function writeSettings(root: string, settings: PrebuildSettings): Promise<void> {
@@ -151,16 +181,15 @@ async function runPrebuild(root: string, clean: boolean): Promise<void> {
 async function assertInitialNativeProject(root: string): Promise<void> {
   const androidRoot = path.join(root, 'android');
   const iosRoot = path.join(root, 'ios');
-  const buildGradle = await readFile(
-    path.join(androidRoot, 'app', 'build.gradle'),
-    'utf8',
-  );
+  const buildGradle = await readFile(path.join(androidRoot, 'app', 'build.gradle'), 'utf8');
   expect(buildGradle).toContain('development {');
   expect(buildGradle).toContain('preview {');
   expect(buildGradle).toContain('production {');
   expect(buildGradle).toContain('"developmentDebug"');
   expect(buildGradle).toContain('"previewDebug"');
   expect(buildGradle).toContain('"productionDebug"');
+  expect(buildGradle).toContain('generateNativeVariantConfig');
+  expect(buildGradle).toContain('environment("EXPO_NATIVE_VARIANT_KEY", variantKey)');
 
   await expectResource(root, 'development', 'Acme Dev');
   await expectResource(root, 'preview', 'Acme Preview');
@@ -182,10 +211,15 @@ async function assertInitialNativeProject(root: string): Promise<void> {
   expect(project).toContain('PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app";');
   expect(project).toContain('name = AcmeShare;');
   expect(project).toContain('PRODUCT_BUNDLE_IDENTIFIER = "com.acme.app.dev.share";');
-  expect(project).toContain(
-    'EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER = "com.acme.app.dev";',
-  );
+  expect(project).toContain('EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER = "com.acme.app.dev";');
   expect(project).toContain('SWIFT_VERSION = 5.0;');
+  expect(project).toContain('ASSETCATALOG_COMPILER_APPICON_NAME = "NativeVariantdevelopment";');
+  expect(project).toContain('ASSETCATALOG_COMPILER_APPICON_NAME = "NativeVariantproduction";');
+  await lstat(
+    path.join(iosRoot, 'Acme/Images.xcassets/NativeVariantdevelopment.appiconset/light.png'),
+  );
+  await lstat(path.join(androidRoot, 'app/src/development/res/mipmap-xxxhdpi/ic_launcher.png'));
+  await assertEmbeddedExpoConfig(root);
 
   const schemes = await readGeneratedSchemeNames(projectFile);
   expect(schemes).toEqual(
@@ -201,24 +235,40 @@ async function assertInitialNativeProject(root: string): Promise<void> {
   expect(infoPlist).toContain('$(EXPO_NATIVE_VARIANT_DISPLAY_NAME)');
   expect(infoPlist).toContain('$(EXPO_NATIVE_VARIANT_URL_SCHEME)');
   expect(infoPlist).not.toContain('<string>com.acme.app</string>');
-  expect(infoPlist).not.toContain(
-    '<string>exp+acme-native-variants-integration</string>',
-  );
+  expect(infoPlist).not.toContain('<string>exp+acme-native-variants-integration</string>');
 
   const extensionEntitlements = await readFile(
     path.join(iosRoot, '.targets', 'AcmeShare', 'generated.entitlements'),
     'utf8',
   );
-  expect(extensionEntitlements).toContain(
-    'group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)',
-  );
+  expect(extensionEntitlements).toContain('group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)');
+}
+
+async function assertEmbeddedExpoConfig(root: string): Promise<void> {
+  for (const [key, environment] of [
+    ['development', {EXPO_NATIVE_VARIANT_KEY: 'development'}],
+    ['preview', {CONFIGURATION: 'Release-Preview'}],
+  ] as const) {
+    const destination = path.join(root, 'embedded-config', key);
+    await mkdir(destination, {recursive: true});
+    await executeFile(
+      process.execPath,
+      ['-e', EXPO_CONFIG_COMMAND, '--', 'expo-native-variants', root, destination],
+      {
+        cwd: root,
+        env: {...process.env, ...environment},
+      },
+    );
+    const config = JSON.parse(await readFile(path.join(destination, 'app.config'), 'utf8'));
+    expect(config.scheme).toBe(`acme-${key === 'development' ? 'dev' : key}`);
+    expect(config.ios.bundleIdentifier).toBe(`com.acme.app.${key === 'development' ? 'dev' : key}`);
+    expect(config.android.package).toBe(config.ios.bundleIdentifier);
+    expect(config).not.toHaveProperty('mods');
+  }
 }
 
 async function assertNoRepeatedOutput(root: string): Promise<void> {
-  const buildGradle = await readFile(
-    path.join(root, 'android', 'app', 'build.gradle'),
-    'utf8',
-  );
+  const buildGradle = await readFile(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
   expect(count(buildGradle, 'expo-native-variants:begin android')).toBe(1);
   expect(count(buildGradle, 'expo-native-variants:begin react')).toBe(1);
 
@@ -230,10 +280,7 @@ async function assertNoRepeatedOutput(root: string): Promise<void> {
 }
 
 async function assertRenamedNativeProject(root: string): Promise<void> {
-  const buildGradle = await readFile(
-    path.join(root, 'android', 'app', 'build.gradle'),
-    'utf8',
-  );
+  const buildGradle = await readFile(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
   expect(buildGradle).toContain('local {');
   expect(buildGradle).toContain('production {');
   expect(buildGradle).not.toContain('development {');
@@ -258,29 +305,13 @@ async function assertRenamedNativeProject(root: string): Promise<void> {
   );
   expect(await readGeneratedSchemeNames(projectFile)).toHaveLength(2);
 
-  const infoPlist = await readFile(
-    await findFile(path.join(root, 'ios'), 'Info.plist'),
-    'utf8',
-  );
+  const infoPlist = await readFile(await findFile(path.join(root, 'ios'), 'Info.plist'), 'utf8');
   expect(infoPlist).toContain('<key>NeighborMarker</key>');
 }
 
-async function expectResource(
-  root: string,
-  flavor: string,
-  displayName: string,
-): Promise<void> {
+async function expectResource(root: string, flavor: string, displayName: string): Promise<void> {
   const resource = await readFile(
-    path.join(
-      root,
-      'android',
-      'app',
-      'src',
-      flavor,
-      'res',
-      'values',
-      'native_variants.xml',
-    ),
+    path.join(root, 'android', 'app', 'src', flavor, 'res', 'values', 'native_variants.xml'),
     'utf8',
   );
   expect(resource).toContain(`<string name="app_name">${displayName}</string>`);
@@ -297,11 +328,7 @@ async function findIosProjectFile(iosRoot: string): Promise<string> {
 }
 
 async function readGeneratedSchemeNames(projectFile: string): Promise<readonly string[]> {
-  const schemeDirectory = path.join(
-    path.dirname(projectFile),
-    'xcshareddata',
-    'xcschemes',
-  );
+  const schemeDirectory = path.join(path.dirname(projectFile), 'xcshareddata', 'xcschemes');
   return (await readdir(schemeDirectory))
     .filter((name) => name.startsWith('Acme-') && name.endsWith('.xcscheme'))
     .sort();

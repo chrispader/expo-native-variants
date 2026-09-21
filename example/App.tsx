@@ -3,7 +3,7 @@ import { getNativeVariant } from 'expo-native-variants/runtime';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { variants } from './variants.json';
+import {variants} from './app.config';
 
 export default function App() {
   const variant = getNativeVariant(Application.applicationId, variants);

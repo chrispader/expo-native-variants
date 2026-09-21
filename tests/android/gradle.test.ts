@@ -6,7 +6,7 @@ import type {NormalizedNativeVariantsOptions} from '../../src/options';
 
 const OPTIONS: NormalizedNativeVariantsOptions = {
     iosTargets: [],
-    canonicalVariant: {
+    selectedVariant: {
         androidApplicationId: 'com.acme.app',
         androidFlavor: 'production',
         debugConfiguration: 'Debug-Production',
@@ -93,7 +93,7 @@ describe('reconcileAppBuildGradle', () => {
         expect(second.match(/productFlavors/g)).toHaveLength(1);
     });
 
-    it('survives Expo reapplying the canonical package on a non-clean prebuild', () => {
+    it('survives Expo reapplying the selected package on a non-clean prebuild', () => {
         const first = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
         const afterExpoPackageMod = AndroidConfig.Package.setPackageInBuildGradle(
             {android: {package: 'com.helloworld'}},

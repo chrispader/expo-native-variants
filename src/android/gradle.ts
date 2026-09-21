@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 
 import type {NormalizedNativeVariantsOptions} from '../options';
+import {createExpoConfigGradle} from './expoConfig';
 
 const PLUGIN_NAME = 'expo-native-variants';
 const REACT_BLOCK_NAME = 'react';
@@ -124,7 +125,9 @@ function createAndroidContent(options: NormalizedNativeVariantsOptions): string 
     return `    flavorDimensions += ${quoteGroovy('nativeVariant')}
     productFlavors {
 ${flavors}
-    }`;
+    }
+
+${createExpoConfigGradle(options)}`;
 }
 
 function quoteGroovy(value: string): string {

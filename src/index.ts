@@ -2,26 +2,37 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';
-import {applyCanonicalIdentifiers} from './options/applyCanonicalIdentifiers';
+import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIdentifiers';
 import {normalizeNativeVariants} from './options';
+import {selectBuildVariant} from './options/selectBuildVariant';
+import {resolveVariantIcons} from './icons/resolve';
 import type {NativeVariantsOptions, NormalizedNativeVariantsOptions} from './options';
 
 export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, options) => {
-  const normalizedOptions = normalizeNativeVariants({
-    configName: config.name,
-    options,
-  });
-
-  const canonicalConfig = applyCanonicalIdentifiers(
+  const normalizedOptions = resolveVariantIcons(
     config,
-    normalizedOptions.canonicalVariant,
+    selectBuildVariant(
+      normalizeNativeVariants({
+        configName: config.name,
+        options: {...options, variant: options?.variant ?? process.env.NATIVE_VARIANT},
+      }),
+      process.env,
+    ),
   );
 
-  return composeNativeVariantMods(canonicalConfig, normalizedOptions);
+  const selectedConfig = applySelectedVariantIdentifiers(
+    config,
+    normalizedOptions.selectedVariant,
+    normalizedOptions.variants,
+  );
+
+  return composeNativeVariantMods(selectedConfig, normalizedOptions);
 };
 
 export {normalizeNativeVariants} from './options';
 export type {
+  NativeVariantAdaptiveIcon,
+  NativeVariantIosIcon,
   NativeVariantAndroidOptions,
   NativeVariantIosOptions,
   NativeVariantMap,

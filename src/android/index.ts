@@ -1,6 +1,7 @@
 import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
+import {syncAndroidIcons} from '../icons/android';
 import type {NormalizedNativeVariantsOptions} from '../options';
 import {reconcileAppBuildGradle} from './gradle';
 import {reconcileAndroidManifest} from './manifest';
@@ -50,6 +51,12 @@ export const withAndroidVariants: ConfigPlugin<NormalizedNativeVariantsOptions> 
     return withDangerousMod(nextConfig, [
         'android',
         async (modConfig) => {
+            if (modConfig.modRequest.introspect) return modConfig;
+            await syncAndroidIcons(
+                modConfig.modRequest.projectRoot,
+                modConfig.modRequest.platformProjectRoot,
+                options,
+            );
             await reconcileAndroidVariantResources(
                 modConfig.modRequest.platformProjectRoot,
                 options,
@@ -69,7 +76,7 @@ function collectExpoFallbackSchemes(
 ): ReadonlySet<string> {
     return new Set([
         ...options.variants.map(({urlScheme}) => urlScheme),
-        options.canonicalVariant.androidApplicationId,
+        options.selectedVariant.androidApplicationId,
         `exp+${config.slug}`,
     ]);
 }

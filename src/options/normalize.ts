@@ -1,24 +1,34 @@
 import type {
+  NativeVariantAndroidOptions,
+  NativeVariantIosOptions,
   NativeVariantRunMode,
   NormalizedNativeVariant,
   NormalizedNativeVariantsIosTarget,
   NormalizedNativeVariantsOptions,
   NormalizeNativeVariantsArgs,
 } from './types';
+import {readAdaptiveIcon, readIconPath, readIosIcon} from './icons';
 
-const ROOT_KEYS = new Set(['canonicalVariant', 'defaultVariant', 'ios', 'variants']);
+const ROOT_KEYS = new Set(['ios', 'variant', 'variants']);
 const ROOT_IOS_KEYS = new Set(['targets']);
 const IOS_TARGET_KEYS = new Set(['bundleIdentifierSuffix']);
 const VARIANT_KEYS = new Set([
   'android',
   'applicationId',
   'displayName',
+  'icon',
   'ios',
   'runMode',
   'urlScheme',
 ]);
-const IOS_KEYS = new Set(['bundleIdentifier', 'xcodeScheme']);
-const ANDROID_KEYS = new Set(['applicationId']);
+const IOS_KEYS = new Set([
+  'bundleIdentifier',
+  'xcodeScheme',
+  'debugConfiguration',
+  'releaseConfiguration',
+  'icon',
+]);
+const ANDROID_KEYS = new Set(['applicationId', 'flavor', 'icon', 'adaptiveIcon']);
 const RESERVED_VARIANT_NAMES = new Set([
   'androidtest',
   'aux',
@@ -41,43 +51,33 @@ const ANDROID_IDENTIFIER_SEGMENT = /^[A-Za-z][A-Za-z0-9_]*$/;
 export function normalizeNativeVariants({
   configName,
   options,
-  canonicalVariant: canonicalOverride,
 }: NormalizeNativeVariantsArgs): NormalizedNativeVariantsOptions {
   validateFileLabel(configName, 'Expo config name');
   const optionsRecord = requireRecord(options, 'Plugin options');
   assertKnownKeys(optionsRecord, ROOT_KEYS, 'Plugin options');
-
-  const defaultVariant = requireNonemptyString(
-    optionsRecord.defaultVariant,
-    'defaultVariant',
-  );
-  const configuredCanonicalVariant = optionalNonemptyString(
-    optionsRecord.canonicalVariant,
-    'canonicalVariant',
-  );
-  const canonicalVariant = canonicalOverride ?? configuredCanonicalVariant ?? defaultVariant;
-  validateVariantKey(defaultVariant, 'defaultVariant');
-  validateVariantKey(canonicalVariant, 'canonicalVariant');
 
   const variantsRecord = requireRecord(optionsRecord.variants, 'variants');
   const variantEntries = Object.entries(variantsRecord);
   if (variantEntries.length === 0) {
     throw new Error('variants must contain at least one variant.');
   }
+  const firstVariantKey = variantEntries[0]?.[0];
+  if (firstVariantKey === undefined) {
+    throw new Error('variants must contain at least one variant.');
+  }
+  const selectedVariantKey =
+    optionalNonemptyString(optionsRecord.variant, 'variant') ?? firstVariantKey;
+  validateVariantKey(selectedVariantKey, 'variant');
 
-  const normalizedVariants = variantEntries.map(([key, variant]) =>
-    normalizeVariant({configName, key, variant}),
+  const normalizedVariants = variantEntries.map(([key, variant], index) =>
+    normalizeVariant({configName, isPrimary: index === 0, key, variant}),
   );
   validateGeneratedNames(normalizedVariants);
   validateUniqueValues(normalizedVariants);
 
-  if (!Object.hasOwn(variantsRecord, defaultVariant)) {
-    throw new Error(`defaultVariant references unknown variant "${defaultVariant}".`);
-  }
-
-  const canonical = normalizedVariants.find(({key}) => key === canonicalVariant);
-  if (canonical === undefined) {
-    throw new Error(`canonicalVariant references unknown variant "${canonicalVariant}".`);
+  const selectedVariant = normalizedVariants.find(({key}) => key === selectedVariantKey);
+  if (selectedVariant === undefined) {
+    throw new Error(`variant references unknown variant "${selectedVariantKey}".`);
   }
 
   const variants = Object.freeze(normalizedVariants);
@@ -85,7 +85,7 @@ export function normalizeNativeVariants({
     value: optionsRecord.ios,
     variants,
   });
-  return Object.freeze({canonicalVariant: canonical, iosTargets, variants});
+  return Object.freeze({iosTargets, selectedVariant, variants});
 }
 
 function normalizeIosTargets({
@@ -120,10 +120,12 @@ function normalizeIosTargets({
 
 function normalizeVariant({
   configName,
+  isPrimary,
   key,
   variant,
 }: Readonly<{
   configName: string;
+  isPrimary: boolean;
   key: string;
   variant: unknown;
 }>): NormalizedNativeVariant {
@@ -131,19 +133,17 @@ function normalizeVariant({
   const variantRecord = requireRecord(variant, `Variant "${key}"`);
   assertKnownKeys(variantRecord, VARIANT_KEYS, `Variant "${key}"`);
 
-  const displayName = requireNonemptyString(
-    variantRecord.displayName,
-    `Variant "${key}" displayName`,
-  );
+  const configLabel = toPascalConfigLabel(key);
+  const displayName =
+    optionalNonemptyString(variantRecord.displayName, `Variant "${key}" displayName`) ??
+    (isPrimary ? configName : `${configName} ${configLabel}`);
   validateText(displayName, `Variant "${key}" displayName`);
   const applicationId = requireNonemptyString(
     variantRecord.applicationId,
     `Variant "${key}" applicationId`,
   );
-  const urlScheme = requireNonemptyString(
-    variantRecord.urlScheme,
-    `Variant "${key}" urlScheme`,
-  );
+  const urlScheme =
+    optionalNonemptyString(variantRecord.urlScheme, `Variant "${key}" urlScheme`) ?? applicationId;
   validateUrlScheme(urlScheme, `Variant "${key}" urlScheme`);
   const runMode = readRunMode(variantRecord.runMode, key);
   const ios = readIosOptions(variantRecord.ios, key);
@@ -151,15 +151,33 @@ function normalizeVariant({
   const iosBundleIdentifier = ios.bundleIdentifier ?? applicationId;
   const androidApplicationId = android.applicationId ?? applicationId;
   validateIosIdentifier(iosBundleIdentifier, `Variant "${key}" iOS bundle identifier`);
-  validateAndroidIdentifier(
-    androidApplicationId,
-    `Variant "${key}" Android application ID`,
-  );
+  validateAndroidIdentifier(androidApplicationId, `Variant "${key}" Android application ID`);
 
-  const configLabel = toPascalConfigLabel(key);
   const generatedIosScheme = `${configName}-${configLabel}`;
   const iosScheme = ios.xcodeScheme ?? generatedIosScheme;
   validateFileLabel(iosScheme, `Variant "${key}" iOS scheme`);
+  const debugConfiguration = ios.debugConfiguration ?? `Debug-${configLabel}`;
+  const releaseConfiguration = ios.releaseConfiguration ?? `Release-${configLabel}`;
+  if (!debugConfiguration.includes('Debug') || releaseConfiguration.includes('Debug')) {
+    throw new Error(
+      `Variant "${key}" debugConfiguration must contain "Debug" and releaseConfiguration must not, as required by React Native's bundling scripts.`,
+    );
+  }
+  for (const name of [debugConfiguration, releaseConfiguration]) {
+    validateFileLabel(name, `Variant "${key}" iOS configuration`);
+    if (['debug', 'release'].includes(name.toLowerCase())) {
+      throw new Error(
+        `Variant "${key}" iOS configuration must not replace the standard Debug or Release configuration.`,
+      );
+    }
+  }
+  const androidFlavor = android.flavor ?? lowerFirst(configLabel);
+  if (!/^[a-z][A-Za-z0-9]*$/.test(androidFlavor)) {
+    throw new Error(
+      `Variant "${key}" Android flavor must start with a lowercase letter and contain only letters and numbers.`,
+    );
+  }
+  const icon = readIconPath(variantRecord.icon, `Variant "${key}" icon`);
 
   return Object.freeze({
     key,
@@ -169,16 +187,17 @@ function normalizeVariant({
     urlScheme,
     runMode,
     iosScheme,
-    debugConfiguration: `Debug-${configLabel}`,
-    releaseConfiguration: `Release-${configLabel}`,
-    androidFlavor: lowerFirst(configLabel),
+    debugConfiguration,
+    releaseConfiguration,
+    androidFlavor,
+    ...(icon === undefined ? {} : {icon}),
+    ...(ios.icon === undefined ? {} : {iosIcon: ios.icon}),
+    ...(android.icon === undefined ? {} : {androidIcon: android.icon}),
+    ...(android.adaptiveIcon === undefined ? {} : {androidAdaptiveIcon: android.adaptiveIcon}),
   });
 }
 
-function readIosOptions(
-  value: unknown,
-  variantKey: string,
-): Readonly<{bundleIdentifier?: string; xcodeScheme?: string}> {
+function readIosOptions(value: unknown, variantKey: string): NativeVariantIosOptions {
   if (value === undefined) {
     return {};
   }
@@ -193,13 +212,24 @@ function readIosOptions(
     record.xcodeScheme,
     `Variant "${variantKey}" ios.xcodeScheme`,
   );
-  return compactOptionalStrings({bundleIdentifier, xcodeScheme});
+  const debugConfiguration = optionalNonemptyString(
+    record.debugConfiguration,
+    `Variant "${variantKey}" ios.debugConfiguration`,
+  );
+  const releaseConfiguration = optionalNonemptyString(
+    record.releaseConfiguration,
+    `Variant "${variantKey}" ios.releaseConfiguration`,
+  );
+  const icon = readIosIcon(record.icon, `Variant "${variantKey}" ios.icon`);
+  return {
+    ...compactOptionalStrings({bundleIdentifier, xcodeScheme}),
+    ...(debugConfiguration === undefined ? {} : {debugConfiguration}),
+    ...(releaseConfiguration === undefined ? {} : {releaseConfiguration}),
+    ...(icon === undefined ? {} : {icon}),
+  };
 }
 
-function readAndroidOptions(
-  value: unknown,
-  variantKey: string,
-): Readonly<{applicationId?: string}> {
+function readAndroidOptions(value: unknown, variantKey: string): NativeVariantAndroidOptions {
   if (value === undefined) {
     return {};
   }
@@ -210,7 +240,18 @@ function readAndroidOptions(
     record.applicationId,
     `Variant "${variantKey}" android.applicationId`,
   );
-  return applicationId === undefined ? {} : {applicationId};
+  const flavor = optionalNonemptyString(record.flavor, `Variant "${variantKey}" android.flavor`);
+  const icon = readIconPath(record.icon, `Variant "${variantKey}" android.icon`);
+  const adaptiveIcon = readAdaptiveIcon(
+    record.adaptiveIcon,
+    `Variant "${variantKey}" android.adaptiveIcon`,
+  );
+  return {
+    ...(applicationId === undefined ? {} : {applicationId}),
+    ...(flavor === undefined ? {} : {flavor}),
+    ...(icon === undefined ? {} : {icon}),
+    ...(adaptiveIcon === undefined ? {} : {adaptiveIcon}),
+  };
 }
 
 function compactOptionalStrings({
@@ -245,17 +286,27 @@ function readRunMode(value: unknown, variantKey: string): NativeVariantRunMode {
 function validateGeneratedNames(variants: readonly NormalizedNativeVariant[]): void {
   for (const variant of variants) {
     const generatedName = variant.androidFlavor.toLowerCase();
-    if (
-      RESERVED_VARIANT_NAMES.has(generatedName) ||
-      WINDOWS_DEVICE_NAME.test(generatedName)
-    ) {
+    if (RESERVED_VARIANT_NAMES.has(generatedName) || WINDOWS_DEVICE_NAME.test(generatedName)) {
       throw new Error(
         `Variant key "${variant.key}" produces reserved name "${variant.androidFlavor}".`,
       );
     }
   }
   assertUnique(variants, ({key}) => key.toLowerCase(), 'variant key');
-  assertUnique(variants, ({debugConfiguration}) => debugConfiguration.toLowerCase(), 'iOS configuration');
+  assertUnique(
+    variants,
+    ({debugConfiguration}) => debugConfiguration.toLowerCase(),
+    'iOS configuration',
+  );
+  const configurationNames = new Set<string>();
+  for (const variant of variants) {
+    for (const name of [variant.debugConfiguration, variant.releaseConfiguration]) {
+      if (configurationNames.has(name.toLowerCase())) {
+        throw new Error(`Variants produce the same iOS configuration "${name}".`);
+      }
+      configurationNames.add(name.toLowerCase());
+    }
+  }
   assertUnique(variants, ({iosScheme}) => iosScheme.toLowerCase(), 'iOS scheme');
   assertUnique(variants, ({androidFlavor}) => androidFlavor.toLowerCase(), 'Android flavor');
 }
@@ -355,10 +406,7 @@ function assertNoCrossVariantRouteCollision({
   variants: readonly NormalizedNativeVariant[];
 }>): void {
   const identifierOwnerByValue = new Map(
-    variants.map((variant) => [
-      selectIdentifier(variant).toLowerCase(),
-      variant.key,
-    ]),
+    variants.map((variant) => [selectIdentifier(variant).toLowerCase(), variant.key]),
   );
 
   for (const variant of variants) {
@@ -432,7 +480,10 @@ function validateIosIdentifier(value: string, label: string): void {
 
 function validateAndroidIdentifier(value: string, label: string): void {
   const segments = value.split('.');
-  if (segments.length < 2 || segments.some((segment) => !ANDROID_IDENTIFIER_SEGMENT.test(segment))) {
+  if (
+    segments.length < 2 ||
+    segments.some((segment) => !ANDROID_IDENTIFIER_SEGMENT.test(segment))
+  ) {
     throw new Error(`${label} must be a valid reverse-DNS application ID.`);
   }
 }

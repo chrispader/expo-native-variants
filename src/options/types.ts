@@ -1,12 +1,33 @@
 export type NativeVariantRunMode = 'debug' | 'release';
 
+export type NativeVariantIosIcon =
+  | string
+  | Readonly<{
+      light?: string;
+      dark?: string;
+      tinted?: string;
+    }>;
+
+export type NativeVariantAdaptiveIcon = Readonly<{
+  foregroundImage?: string;
+  backgroundImage?: string;
+  backgroundColor?: string;
+  monochromeImage?: string;
+}>;
+
 export type NativeVariantIosOptions = Readonly<{
   bundleIdentifier?: string;
   xcodeScheme?: string;
+  debugConfiguration?: string;
+  releaseConfiguration?: string;
+  icon?: NativeVariantIosIcon;
 }>;
 
 export type NativeVariantAndroidOptions = Readonly<{
   applicationId?: string;
+  flavor?: string;
+  icon?: string;
+  adaptiveIcon?: NativeVariantAdaptiveIcon;
 }>;
 
 export type NativeVariantsIosTargetOptions = Readonly<{
@@ -18,9 +39,10 @@ export type NativeVariantsIosOptions = Readonly<{
 }>;
 
 export type NativeVariantOptions = Readonly<{
-  displayName: string;
   applicationId: string;
-  urlScheme: string;
+  icon?: string;
+  displayName?: string;
+  urlScheme?: string;
   runMode?: NativeVariantRunMode;
   ios?: NativeVariantIosOptions;
   android?: NativeVariantAndroidOptions;
@@ -29,8 +51,13 @@ export type NativeVariantOptions = Readonly<{
 export type NativeVariantMap = Readonly<Record<string, NativeVariantOptions>>;
 
 export type NativeVariantsOptions = Readonly<{
-  defaultVariant: string;
-  canonicalVariant?: string;
+  /**
+   * App identity used when evaluating Expo config, for example during EAS signing
+   * setup. Defaults to NATIVE_VARIANT, then the first declared variant. This does
+   * not filter the generated native builds. Native compilation uses its actual
+   * Xcode configuration or Android flavor for embedded metadata.
+   */
+  variant?: string | undefined;
   ios?: NativeVariantsIosOptions;
   variants: NativeVariantMap;
 }>;
@@ -46,6 +73,10 @@ export type NormalizedNativeVariant = Readonly<{
   debugConfiguration: string;
   releaseConfiguration: string;
   androidFlavor: string;
+  icon?: string;
+  iosIcon?: NativeVariantIosIcon;
+  androidIcon?: string;
+  androidAdaptiveIcon?: NativeVariantAdaptiveIcon;
 }>;
 
 export type NormalizedNativeVariantsIosTarget = Readonly<{
@@ -55,12 +86,11 @@ export type NormalizedNativeVariantsIosTarget = Readonly<{
 
 export type NormalizedNativeVariantsOptions = Readonly<{
   variants: readonly NormalizedNativeVariant[];
-  canonicalVariant: NormalizedNativeVariant;
+  selectedVariant: NormalizedNativeVariant;
   iosTargets: readonly NormalizedNativeVariantsIosTarget[];
 }>;
 
 export type NormalizeNativeVariantsArgs = Readonly<{
   configName: string;
   options: unknown;
-  canonicalVariant?: string;
 }>;
