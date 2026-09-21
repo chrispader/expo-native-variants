@@ -28,7 +28,10 @@ export async function syncAndroidIcons(
       const mipmap = `${resourceRoot}/mipmap-${density}`;
       const legacyImage = await renderLegacyIcon(projectRoot, legacy, 48 * scale, adaptive);
       files.set(`${mipmap}/ic_launcher.png`, legacyImage);
-      files.set(`${mipmap}/ic_launcher_round.png`, legacyImage);
+      files.set(
+        `${mipmap}/ic_launcher_round.png`,
+        await renderLegacyIcon(projectRoot, legacy, 48 * scale, adaptive, true),
+      );
       files.set(
         `${mipmap}/native_variant_foreground.png`,
         await renderIcon(projectRoot, foreground, 108 * scale),

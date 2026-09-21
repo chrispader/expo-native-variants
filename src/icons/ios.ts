@@ -25,7 +25,7 @@ export async function syncIosIcons(
       const filename = `${appearance}.png`;
       files.set(
         `${name}.appiconset/${filename}`,
-        await renderIcon(projectRoot, source, 1024, appearance !== 'tinted'),
+        await renderIcon(projectRoot, source, 1024, {opaque: appearance !== 'tinted'}),
       );
       images.push({
         filename,

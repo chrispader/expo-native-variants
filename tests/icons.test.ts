@@ -115,6 +115,11 @@ describe('variant icons', () => {
       width: 192,
       height: 192,
     });
+    const regular = await getPngInfo(path.join(resources, 'mipmap-xxxhdpi/ic_launcher.png'));
+    const round = await getPngInfo(path.join(resources, 'mipmap-xxxhdpi/ic_launcher_round.png'));
+    expect(alphaAt(regular, 0, 0)).toBe(255);
+    expect(alphaAt(round, 0, 0)).toBe(0);
+    expect(alphaAt(round, round.width / 2, round.height / 2)).toBe(255);
     expect(
       await getPngInfo(path.join(resources, 'mipmap-xxxhdpi/native_variant_foreground.png')),
     ).toMatchObject({width: 432, height: 432});
@@ -145,4 +150,12 @@ async function temporaryRoot(): Promise<string> {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'native-variant-icons-'));
   directories.push(directory);
   return directory;
+}
+
+function alphaAt(
+  image: Awaited<ReturnType<typeof getPngInfo>>,
+  x: number,
+  y: number,
+): number | undefined {
+  return image.data[(y * image.width + x) * 4 + 3];
 }
