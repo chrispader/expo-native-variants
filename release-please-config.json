@@ -4,9 +4,6 @@
     ".": {
       "release-type": "node",
       "include-component-in-tag": false,
-      "prerelease": true,
-      "prerelease-type": "alpha",
-      "versioning": "prerelease",
       "extra-files": [
         {
           "type": "generic",

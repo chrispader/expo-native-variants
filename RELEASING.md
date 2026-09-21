@@ -4,6 +4,6 @@ Releases are driven by conventional commits on `main`. Release Please keeps a re
 
 `fix:` commits request a patch release, `feat:` commits request a minor release, and commits with a breaking-change marker request a major release. Other commit types do not normally request a release.
 
-The current configuration publishes alpha prereleases. Prerelease versions use the npm `next` tag, while stable versions use `latest`. To promote the package to a stable release, change `prerelease` to `false` and `versioning` to `default` in `release-please-config.json`, then merge the resulting release pull request.
+Stable versions use the npm `latest` tag, while prerelease versions use `next`. To begin an alpha release line, set `prerelease` to `true`, `prerelease-type` to `alpha`, and `versioning` to `prerelease` in `release-please-config.json`.
 
 If package publication fails after the GitHub release was created, run the release workflow manually with the existing release tag. The workflow verifies that the tag matches `package.json` before attempting publication again.
