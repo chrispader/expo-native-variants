@@ -58,6 +58,16 @@ The Expo prebuild integration creates a share extension with `@bacons/apple-targ
 
 On this Expo 57 toolchain, `@bacons/apple-targets@5.0.0` throws while replacing its own extension configuration list during a repeated non-clean prebuild. Clean prebuilds pass. The failure occurs in that plugin's custom Xcode mod before `expo-native-variants` runs.
 
+## Plugin-only API and icon validation
+
+The September 21, 2026 API changes have 128 passing unit tests, passing root and example TypeScript checks, and passing extracted-package verification. Expo's actual Linking resolver reproduces the missing-scheme production crash before the plugin runs and resolves the intended scheme afterward.
+
+Real Expo prebuild tests cover per-variant icons, extension compatibility, repeated non-clean generation without the extension plugin, and removal of renamed variants' owned assets. The embedded-config check executes the same Expo Constants command used by the generated Android tasks and checks iOS configuration-based selection too.
+
+Android asset merging and resource compilation pass for `developmentDebug`, `previewRelease`, and `productionRelease`. Building those asset variants together produces three different merged `app.config` files with the expected URL schemes and identifiers. The native build validation script now checks the embedded config inside each APK and iOS app bundle.
+
+Apple's asset compiler accepts all three example icon catalogs with each catalog selected as the primary app icon. These checks did not rerun full native app compilation, device launches, EAS cloud builds, or signing for this API change. Earlier native-build and device results above describe the previous release, not this change.
+
 ## Compatibility limits
 
 Expo `58.0.0-preview.3` passed an isolated clean prebuild advisory check. Its native compilation and runtime behavior remain untested. The package's supported peer range stays on SDK 57.

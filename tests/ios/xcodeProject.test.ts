@@ -41,6 +41,33 @@ const extensionOptions: NormalizedNativeVariantsOptions = {
 };
 
 describe(updateXcodeProject, () => {
+  it('selects per-variant icon catalogs for the app and keeps extension icon settings untouched', () => {
+    const fixture = createProjectFixture();
+    addExtensionTarget(fixture);
+    const iconDevelopment = {...development, iosIcon: 'dev.png'};
+    const iconProduction = {...production, iosIcon: 'prod.png'};
+    updateXcodeProject(fixture.project, {
+      ...extensionOptions,
+      selectedVariant: iconProduction,
+      variants: [iconDevelopment, iconProduction],
+    });
+    expect(
+      getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development').buildSettings
+        .ASSETCATALOG_COMPILER_APPICON_NAME,
+    ).toBe('"NativeVariantdevelopment"');
+    expect(
+      getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Release').buildSettings
+        .ASSETCATALOG_COMPILER_APPICON_NAME,
+    ).toBe('"NativeVariantproduction"');
+    expect(
+      getConfiguration(fixture, 'EXTENSION_CONFIG_LIST', 'Debug-Development').buildSettings,
+    ).not.toHaveProperty('ASSETCATALOG_COMPILER_APPICON_NAME');
+    updateXcodeProject(fixture.project, extensionOptions);
+    expect(
+      getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development').buildSettings
+        .ASSETCATALOG_COMPILER_APPICON_NAME,
+    ).toBe('AppIcon');
+  });
   it('clones project and target configurations while preserving base settings', () => {
     const fixture = createProjectFixture();
     const metadata = updateXcodeProject(fixture.project, options);
@@ -50,11 +77,7 @@ describe(updateXcodeProject, () => {
       targetName: 'Acme',
       productName: 'Acme',
     });
-    const targetDevelopment = getConfiguration(
-      fixture,
-      'TARGET_CONFIG_LIST',
-      'Debug-Development',
-    );
+    const targetDevelopment = getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development');
     expect(targetDevelopment.buildSettings).toMatchObject({
       CUSTOM_DEBUG_SETTING: 'kept',
       EXPO_NATIVE_VARIANTS_MANAGED: 'YES',
@@ -76,9 +99,7 @@ describe(updateXcodeProject, () => {
     const fixture = createProjectFixture();
     updateXcodeProject(fixture.project, options);
 
-    expect(
-      getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug').buildSettings,
-    ).toMatchObject({
+    expect(getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug').buildSettings).toMatchObject({
       EXPO_NATIVE_VARIANT_DISPLAY_NAME: '"Acme"',
       PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app"',
     });
@@ -87,14 +108,9 @@ describe(updateXcodeProject, () => {
   it('preserves CocoaPods references added to managed configurations', () => {
     const fixture = createProjectFixture();
     updateXcodeProject(fixture.project, options);
-    const developmentConfig = getConfiguration(
-      fixture,
-      'TARGET_CONFIG_LIST',
-      'Debug-Development',
-    );
+    const developmentConfig = getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development');
     developmentConfig.baseConfigurationReference = 'PODS_DEVELOPMENT';
-    developmentConfig.baseConfigurationReference_comment =
-      'Pods-Acme.debug-development.xcconfig';
+    developmentConfig.baseConfigurationReference_comment = 'Pods-Acme.debug-development.xcconfig';
     getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug').buildSettings.NEW_BASE_SETTING =
       'propagated';
 
@@ -115,9 +131,7 @@ describe(updateXcodeProject, () => {
 
     updateXcodeProject(fixture.project, productionOnly);
 
-    expect(() =>
-      getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development'),
-    ).toThrow();
+    expect(() => getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development')).toThrow();
     expect(getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Staging')).toBeDefined();
   });
 
@@ -141,18 +155,14 @@ describe(updateXcodeProject, () => {
       PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.dev.share"',
       SWIFT_VERSION: '5.0',
     });
-    expect(developmentConfig.buildSettings).not.toHaveProperty(
-      'EXPO_NATIVE_VARIANT_DISPLAY_NAME',
+    expect(developmentConfig.buildSettings).not.toHaveProperty('EXPO_NATIVE_VARIANT_DISPLAY_NAME');
+    expect(developmentConfig.buildSettings).not.toHaveProperty('EXPO_NATIVE_VARIANT_URL_SCHEME');
+    expect(getConfiguration(fixture, 'EXTENSION_CONFIG_LIST', 'Debug').buildSettings).toMatchObject(
+      {
+        EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER: '"com.acme.app"',
+        PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.share"',
+      },
     );
-    expect(developmentConfig.buildSettings).not.toHaveProperty(
-      'EXPO_NATIVE_VARIANT_URL_SCHEME',
-    );
-    expect(
-      getConfiguration(fixture, 'EXTENSION_CONFIG_LIST', 'Debug').buildSettings,
-    ).toMatchObject({
-      EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER: '"com.acme.app"',
-      PRODUCT_BUNDLE_IDENTIFIER: '"com.acme.app.share"',
-    });
   });
 
   it('rejects additional native targets that are not configured', () => {
@@ -322,9 +332,7 @@ function getConfiguration(
   }
   const reference = list.buildConfigurations.find((entry) => entry.comment === name);
   const configuration =
-    reference === undefined
-      ? undefined
-      : fixture.sections.configurations[reference.value];
+    reference === undefined ? undefined : fixture.sections.configurations[reference.value];
   if (!isConfiguration(configuration)) {
     throw new Error(`Missing configuration ${name}`);
   }

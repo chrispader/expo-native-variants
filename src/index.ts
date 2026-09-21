@@ -4,17 +4,26 @@ import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';
 import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIdentifiers';
 import {normalizeNativeVariants} from './options';
+import {selectBuildVariant} from './options/selectBuildVariant';
+import {resolveVariantIcons} from './icons/resolve';
 import type {NativeVariantsOptions, NormalizedNativeVariantsOptions} from './options';
 
 export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, options) => {
-  const normalizedOptions = normalizeNativeVariants({
-    configName: config.name,
-    options,
-  });
+  const normalizedOptions = resolveVariantIcons(
+    config,
+    selectBuildVariant(
+      normalizeNativeVariants({
+        configName: config.name,
+        options: {...options, variant: options?.variant ?? process.env.NATIVE_VARIANT},
+      }),
+      process.env,
+    ),
+  );
 
   const selectedConfig = applySelectedVariantIdentifiers(
     config,
     normalizedOptions.selectedVariant,
+    normalizedOptions.variants,
   );
 
   return composeNativeVariantMods(selectedConfig, normalizedOptions);
@@ -22,6 +31,8 @@ export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, 
 
 export {normalizeNativeVariants} from './options';
 export type {
+  NativeVariantAdaptiveIcon,
+  NativeVariantIosIcon,
   NativeVariantAndroidOptions,
   NativeVariantIosOptions,
   NativeVariantMap,

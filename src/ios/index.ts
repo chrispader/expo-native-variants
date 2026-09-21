@@ -3,6 +3,7 @@ import {writeFile} from 'node:fs/promises';
 import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
+import {syncIosIcons} from '../icons/ios';
 import type {NormalizedNativeVariantsOptions} from '../options';
 import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
 import {updatePodfile} from './podfile';
@@ -54,6 +55,14 @@ export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
   });
 
   config = withDangerousMod(config, ['ios', async (modConfig) => {
+    if (!modConfig.modRequest.introspect) {
+      await syncIosIcons(
+        modConfig.modRequest.projectRoot,
+        modConfig.modRequest.platformProjectRoot,
+        requireProjectName(modConfig.modRequest.projectName),
+        options,
+      );
+    }
     const project = IOSConfig.XcodeUtils.getPbxproj(modConfig.modRequest.projectRoot);
     const metadata = getXcodeProjectMetadata(project);
     await syncSchemeFilesMod({

@@ -57,19 +57,74 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 
 ## Options
 
-The first declared variant supplies the Expo application identifiers and the ordinary iOS `Debug` and `Release` configurations. Set the optional plugin `variant` property when a tool such as EAS needs another variant to be selected. The plugin replaces `ios.bundleIdentifier` and `android.package` with the selected identifiers. Every variant is generated regardless of the selection.
+The first declared variant supplies the Expo application identifiers, URL scheme, and ordinary iOS `Debug` and `Release` configurations. Set `NATIVE_VARIANT` when a tool needs the config for a different app. The plugin fills `ios.bundleIdentifier`, `android.package`, and `scheme`; no wrapper or `getUrlScheme` function is needed. It preserves additional, non-variant schemes after the preferred scheme.
 
-`variants` is the only required plugin option. `variant` selects one entry when declaration order is not enough, and `ios.targets` adds extension targets created by another plugin.
+`variants` is the only required plugin option. The optional `variant` property overrides `NATIVE_VARIANT` during Expo config evaluation, and `ios.targets` adds extension targets created by another plugin. Neither `variant` nor the environment variable limits the generated matrix: every variant is generated.
 
 | Variant option | Purpose |
 | --- | --- |
 | `applicationId` | Full identifier shared by iOS and Android |
+| `icon` | Optional image shared by iOS and Android for this variant |
 | `displayName` | Optional name shown under the app icon; defaults to the Expo app name for the first variant and adds the variant name for the others |
 | `urlScheme` | Optional custom URL scheme; defaults to `applicationId` |
 | `runMode` | Xcode Run action's mode, `debug` by default |
 | `ios.bundleIdentifier` | Optional replacement for the shared identifier on iOS |
 | `ios.xcodeScheme` | Optional Xcode build-scheme name |
+| `ios.debugConfiguration` | Optional debug configuration name; must contain `Debug` for React Native's bundling scripts |
+| `ios.releaseConfiguration` | Optional release configuration name; must not contain `Debug` |
+| `ios.icon` | Optional iOS image or `{light, dark, tinted}` appearance images |
 | `android.applicationId` | Optional replacement for the shared identifier on Android |
+| `android.flavor` | Optional Android product flavor name, starting with a lowercase letter |
+| `android.icon` | Optional Android launcher image |
+| `android.adaptiveIcon` | Optional `foregroundImage`, `backgroundImage`, `backgroundColor`, and `monochromeImage` |
+
+### Icons
+
+Put each icon next to its variant. Selecting an Xcode configuration or Android flavor selects its native icon; there is no JavaScript icon switch.
+
+```ts
+export const variants = {
+  production: {
+    applicationId: 'com.acme.app',
+    icon: './assets/production.png',
+  },
+  development: {
+    applicationId: 'com.acme.app.dev',
+    icon: './assets/development.png',
+  },
+  preview: {
+    applicationId: 'com.acme.app.preview',
+    icon: './assets/preview.png',
+  },
+} satisfies NativeVariantMap;
+```
+
+Platform-specific overrides are optional:
+
+```ts
+preview: {
+  applicationId: 'com.acme.app.preview',
+  icon: './assets/preview.png',
+  ios: {
+    icon: {
+      light: './assets/preview.png',
+      dark: './assets/preview-dark.png',
+      tinted: './assets/preview-tinted.png',
+    },
+  },
+  android: {
+    adaptiveIcon: {
+      foregroundImage: './assets/preview-foreground.png',
+      backgroundColor: '#3A2418',
+      monochromeImage: './assets/monochrome.png',
+    },
+  },
+},
+```
+
+An omitted variant icon inherits the corresponding shared Expo icon settings. An explicit variant `icon` replaces shared artwork, including Android adaptive layers, unless a platform override is supplied. With only `icon`, Android uses that image for both legacy and adaptive launcher icons. Keep important artwork within the adaptive icon safe area. With only `android.adaptiveIcon.foregroundImage`, that image also supplies the legacy icon.
+
+The plugin generates iOS asset catalogs and Android flavor resources, updates them on prebuild, and removes stale files it owns. It refuses to overwrite manually edited output. Use source images to make changes. Per-variant Icon Composer `.icon` directories are not supported.
 
 ### iOS extension targets
 
@@ -143,32 +198,37 @@ Each variant gets its own custom URL scheme. If using `expo-dev-client`, configu
 
 Keep this entry before `expo-native-variants` in the plugins array. Existing third-party URL registrations are not automatically rewritten for separate OAuth applications. Configure those services explicitly and check their callbacks with every installed variant.
 
-Start Metro with the selected variant's explicit scheme. Expo CLI's Android scheme discovery reads the unexpanded manifest placeholders, so its automatically generated launch URL may contain a placeholder.
+Native builds automatically supply their identity when generating the embedded Expo config: iOS uses the build configuration, and Android generates a separate `expo-constants` asset for each flavor. The embedded scheme therefore matches the built app even when prebuild used a different default.
+
+A Metro server still serves one shared Expo manifest. Start it with `NATIVE_VARIANT` for the app you are developing. Keep the explicit `--scheme` as well: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
 
 ```sh
-expo start --dev-client --scheme acme-dev
+NATIVE_VARIANT=development expo start --dev-client --scheme acme-dev
 ```
 
 The Android development launcher also registers its own fixed `expo-dev-launcher` authentication scheme. That upstream callback remains shared when several debug clients are installed. The plugin preserves it and emits a warning. Use each variant's configured URL scheme for application links and development-client launch URLs.
 
 ## Experimental EAS configuration
 
-EAS reads application identifiers before native generation. Pass the profile selection through the plugin's optional `variant` property so the plugin projects the matching identifiers during app config evaluation. It still generates every variant.
+EAS builds one app per job and reads its bundle identifier before native generation to select signing credentials and provisioning profiles. A profile named `preview` is not automatically connected to a variant with the same name. Connect them once in `eas.json`:
 
-```ts
-export default {
-  name: 'Acme',
-  slug: 'acme',
-  plugins: [
-    ['expo-native-variants', {
-      variant: process.env.NATIVE_VARIANT,
-      variants,
-    }],
-  ],
-} satisfies ExpoConfig;
+```json
+{
+  "build": {
+    "preview": {
+      "env": {"NATIVE_VARIANT": "preview"},
+      "android": {"gradleCommand": ":app:assemblePreviewRelease"},
+      "ios": {"buildConfiguration": "Release"}
+    }
+  }
+}
 ```
 
-Declare `NATIVE_VARIANT` explicitly in each EAS profile's `env` object. Local development can leave it unset and switch between generated native variants as usual. When unset, the plugin selects the first declared variant. The plugin does not read environment variables itself.
+Then choose `eas build --profile preview`. The plugin reads `NATIVE_VARIANT` automatically; `app.config.ts` still only needs `['expo-native-variants', {variants}]`. All native variants are generated, but EAS prepares credentials for preview and the profile builds preview.
+
+Why not infer this from the EAS profile name? Expo's built-in `EAS_BUILD_PROFILE` is [not available during local app-config evaluation](https://docs.expo.dev/eas/environment-variables/usage/#using-environment-variables-with-eas-build). Profile `env` values are available both locally and on the builder. Using only the cloud profile name could select different identifiers during signing setup and the actual build.
+
+The `variant` plugin option is an escape hatch for config evaluation, not a build-matrix selector. For example, `variant: process.env.APP_VARIANT` lets an existing project keep its own environment-variable name. Without an override or `NATIVE_VARIANT`, config evaluation uses the first declared variant. During native compilation, the actual build identity takes precedence so its embedded metadata cannot accidentally use the config-evaluation default.
 
 The [example profiles](./example/eas.json) select Android Gradle tasks and ordinary iOS Debug/Release configurations. Treat them as a starting point. Cloud builds, signing, provisioning, and credential selection have not been verified, so EAS support is experimental. Do not rely on the cloud-only `EAS_BUILD_PROFILE` variable for local credential preflight.
 
@@ -180,9 +240,9 @@ Extension support has been tested with `@bacons/apple-targets@5.0.0` using clean
 
 Expo SDK 57's default iOS template does not enable scene lifecycle support. A build linked with the iOS 27 SDK can crash on iOS 27 before JavaScript starts. Use Expo's [official scene-support configuration](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md) when targeting that combination. The example's launch tests use iOS 26.5.
 
-The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, icons, Firebase service files, entitlements, and update channels are not supported options. Other plugins can still modify native settings, so validate integrations that touch the same files.
+The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, Firebase service files, entitlements, and update channels are not supported options. Other plugins can still modify native settings, so validate integrations that touch the same files.
 
-Remote update routing is not isolated by application identifiers alone. Configure and test update channels and runtime compatibility separately. The example disables remote updates.
+Remote update routing is not isolated by application identifiers alone. Configure and test update channels and runtime compatibility separately, and publish with the intended `NATIVE_VARIANT`: a downloaded update's manifest can replace the embedded Expo config. The example disables remote updates.
 
 EAS support remains experimental until its credential preflight and cloud artifacts have been verified. Managed EAS builds resolve app identifiers before native generation and do not select arbitrary generated iOS schemes in the same way as Xcode. Local native generation does not establish EAS compatibility.
 

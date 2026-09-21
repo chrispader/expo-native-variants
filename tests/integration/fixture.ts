@@ -5,6 +5,7 @@ type VariantSettings = Readonly<{
   displayName: string;
   runMode: 'debug' | 'release';
   urlScheme: string;
+  icon: string;
 }>;
 
 type IosTargetSettings = Readonly<{
@@ -65,7 +66,8 @@ function variant(
   urlScheme: string,
   runMode: 'debug' | 'release',
 ): VariantSettings {
-  return {applicationId, displayName, runMode, urlScheme};
+  const icon = runMode === 'debug' ? './icons/development.png' : './icons/production.png';
+  return {applicationId, displayName, runMode, urlScheme, icon};
 }
 
 export const CONSUMER_PACKAGE = {

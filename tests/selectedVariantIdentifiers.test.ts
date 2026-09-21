@@ -17,7 +17,7 @@ const selectedVariant = {
 } satisfies NormalizedNativeVariant;
 
 describe('applySelectedVariantIdentifiers', () => {
-  it('fills missing base identifiers without changing the shared name or scheme', () => {
+  it('sets the preferred linking scheme while preserving the name and auxiliary schemes', () => {
     const config = applySelectedVariantIdentifiers(
       {
         name: 'Acme shared project',
@@ -30,7 +30,7 @@ describe('applySelectedVariantIdentifiers', () => {
     expect(config.ios?.bundleIdentifier).toBe('com.acme.app');
     expect(config.android?.package).toBe('com.acme.app');
     expect(config.name).toBe('Acme shared project');
-    expect(config.scheme).toEqual(['acme-shared', 'oauth-callback']);
+    expect(config.scheme).toEqual(['acme', 'acme-shared', 'oauth-callback']);
   });
 
   it('replaces existing identifiers with the selected variant', () => {

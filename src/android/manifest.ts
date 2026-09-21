@@ -71,6 +71,23 @@ function reconcileMainActivityFilter(
         if (isManagedFilter(filter)) {
             return [];
         }
+        // Expo appends config.scheme to every existing VIEW filter on non-clean
+        // prebuilds, including ours. Retain auxiliary schemes in a separate filter.
+        const hasOnlySchemes = data.every((entry) =>
+            entry.$ !== undefined && Object.keys(entry.$).length === 1 &&
+            typeof entry.$['android:scheme'] === 'string',
+        );
+        if (
+            data[0]?.$?.['android:scheme'] === MANAGED_SCHEME &&
+            data[1]?.$?.['android:scheme'] === APPLICATION_ID_SCHEME &&
+            hasOnlySchemes && filter.$ === undefined &&
+            filter.action?.length === 1 && filter.category?.length === 2
+        ) {
+            const extra = data.slice(2).filter((entry) =>
+                !fallbackSchemes.has(entry.$['android:scheme'] ?? ''),
+            );
+            return extra.length === 0 ? [] : [{...filter, data: extra}];
+        }
         throw new Error(
             'expo-native-variants found its manifest placeholder in an intent filter it does not own.',
         );
@@ -151,7 +168,11 @@ function createManagedIntentFilter(): IntentFilter {
 
 function isManagedFilter(filter: IntentFilter): boolean {
     const data = filter.data ?? [];
-    if (!isBrowsableViewFilter(filter) || data[0]?.$?.['android:scheme'] !== MANAGED_SCHEME) {
+    if (
+        !isBrowsableViewFilter(filter) || data[0]?.$?.['android:scheme'] !== MANAGED_SCHEME ||
+        filter.$ !== undefined || filter.action?.length !== 1 || filter.category?.length !== 2 ||
+        data.some((entry) => entry.$ === undefined || Object.keys(entry.$).length !== 1)
+    ) {
         return false;
     }
 

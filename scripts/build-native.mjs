@@ -107,6 +107,8 @@ async function collectAndroidArtifact({variant, mode, variantName}) {
   }
   const apkPath = path.join(outputDirectory, outputFile);
   await requireFile(apkPath, `${variantName} did not produce ${outputFile}.`);
+  const {stdout: embeddedConfig} = await executeFile('unzip', ['-p', apkPath, 'assets/app.config']);
+  verifyEmbeddedConfig(JSON.parse(embeddedConfig), variant, variantName);
   const destination = path.join(
     artifactRoot,
     'android',
@@ -135,7 +137,7 @@ async function buildIos() {
 
   for (const variant of variants) {
     for (const mode of ['debug', 'release']) {
-      const configuration = `${capitalize(mode)}-${variant.configurationLabel}`;
+      const configuration = mode === 'debug' ? variant.debugConfiguration : variant.releaseConfiguration;
       const scheme = variant.iosScheme ?? `${projectName}-${variant.configurationLabel}`;
       const buildName = `${variant.key}-${mode}`;
       const logPath = path.join(artifactRoot, 'logs', 'ios', `${buildName}.log`);
@@ -200,9 +202,14 @@ async function collectIosArtifact({
   await requireDirectory(appPath, `${configuration} did not produce ${projectName}.app.`);
 
   const infoPlistPath = path.join(appPath, 'Info.plist');
+  verifyEmbeddedConfig(
+    JSON.parse(await readFile(path.join(appPath, 'EXConstants.bundle', 'app.config'), 'utf8')),
+    variant,
+    configuration,
+  );
   await verifyBundleMode({
     bundlePath: path.join(appPath, 'main.jsbundle'),
-    mode: configuration.startsWith('Debug-') ? 'debug' : 'release',
+    mode: configuration === variant.debugConfiguration ? 'debug' : 'release',
     label: `iOS ${configuration}`,
   });
   const applicationId = await readPlistValue(infoPlistPath, 'CFBundleIdentifier');
@@ -329,12 +336,26 @@ async function readVariants() {
       displayName:
         value.displayName ?? (index === 0 ? config.name : `${config.name} ${configurationLabel}`),
       androidApplicationId: value.android?.applicationId ?? value.applicationId,
-      androidFlavor: lowerFirst(configurationLabel),
+      urlScheme: value.urlScheme ?? value.applicationId,
+      androidFlavor: value.android?.flavor ?? lowerFirst(configurationLabel),
+      debugConfiguration: value.ios?.debugConfiguration ?? `Debug-${configurationLabel}`,
+      releaseConfiguration: value.ios?.releaseConfiguration ?? `Release-${configurationLabel}`,
       iosBundleIdentifier: value.ios?.bundleIdentifier ?? value.applicationId,
       iosScheme: value.ios?.xcodeScheme,
       configurationLabel,
     };
   });
+}
+
+function verifyEmbeddedConfig(config, variant, label) {
+  const scheme = Array.isArray(config.scheme) ? config.scheme[0] : config.scheme;
+  if (
+    scheme !== variant.urlScheme ||
+    config.android?.package !== variant.androidApplicationId ||
+    config.ios?.bundleIdentifier !== variant.iosBundleIdentifier
+  ) {
+    throw new Error(`${label} embedded Expo config for the wrong variant.`);
+  }
 }
 
 async function requireDirectory(directory, message) {

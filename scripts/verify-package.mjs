@@ -124,6 +124,7 @@ async function extractIntoConsumer(temporaryRoot, artifactPath) {
     {maxBuffer: 4 * 1024 * 1024},
   );
   await Promise.all([
+    linkDependency(nodeModules, '@expo/image-utils'),
     linkDependency(nodeModules, 'expo'),
     linkDependency(nodeModules, 'react'),
     linkDependency(nodeModules, 'react-native'),
@@ -139,6 +140,7 @@ async function extractIntoConsumer(temporaryRoot, artifactPath) {
 }
 
 async function linkDependency(nodeModules, dependency) {
+  await mkdir(path.dirname(path.join(nodeModules, dependency)), {recursive: true});
   await symlink(
     path.join(repositoryRoot, 'node_modules', dependency),
     path.join(nodeModules, dependency),
