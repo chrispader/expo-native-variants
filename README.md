@@ -2,18 +2,19 @@
 
 Generate every native app variant in one Expo prebuild. Switch between development, preview, and production in Xcode or Android Studio while keeping `ios/` and `android/` generated and ignored by Git.
 
-The simplified configuration API is available as the `0.2.0-alpha.0` prerelease under the `next` tag. The `latest` tag remains on `0.1.0` while the new API is tested in consumer apps.
+Stable releases use the npm `latest` tag, while prereleases use `next`.
 
 This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 
 See the [validation record](./VALIDATION.md) for tested toolchain versions and results.
+Release maintainers can find the automated process in [RELEASING.md](./RELEASING.md).
 
 ## Configure variants
 
 Install `expo-native-variants` in your Expo project and add it to the `plugins` array in your app config. Each variant only requires a complete application identifier. Declare the primary variant first.
 
 ```sh
-bun add expo-native-variants@next
+bun add expo-native-variants
 ```
 
 ```ts

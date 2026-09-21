@@ -1,34 +1,58 @@
-name: Publish package
+name: Release package
 
 on:
-  release:
-    types:
-      - published
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing version tag to publish
-        required: true
+        description: Existing version tag to republish after a failed publish job
+        required: false
         type: string
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
+  release:
+    name: Prepare or create release
+    if: ${{ inputs.release_tag == '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Maintain release pull request
+        id: release
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   publish:
     name: Publish to npm
+    needs: release
+    if: >-
+      ${{ always() && (needs.release.outputs.release_created == 'true' || inputs.release_tag != '') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     env:
       CI: true
-      NPM_DIST_TAG: ${{ contains(github.event.release.tag_name || inputs.release_tag, '-') && 'next' || 'latest' }}
-      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+      NPM_DIST_TAG: ${{ contains(needs.release.outputs.tag_name || inputs.release_tag, '-') && 'next' || 'latest' }}
+      RELEASE_TAG: ${{ needs.release.outputs.tag_name || inputs.release_tag }}
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ github.event.release.tag_name || inputs.release_tag }}
+          ref: ${{ needs.release.outputs.tag_name || inputs.release_tag }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v7.0.0
@@ -54,6 +78,7 @@ jobs:
           bun run typecheck
           bun run verify:package
           bun run typecheck:example
+          bun run test:integration
 
       - name: Publish package
         run: npm publish --access public --tag "$NPM_DIST_TAG"
