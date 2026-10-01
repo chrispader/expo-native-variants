@@ -68,6 +68,7 @@ The first declared variant supplies the Expo application identifiers, URL scheme
 | `icon` | Optional image shared by iOS and Android for this variant |
 | `displayName` | Optional name shown under the app icon; defaults to the Expo app name for the first variant and adds the variant name for the others |
 | `urlScheme` | Optional custom URL scheme; defaults to `applicationId` |
+| `updateChannel` | Optional native Expo Updates channel; omitted variants inherit the shared or EAS channel |
 | `runMode` | Xcode Run action's mode, `debug` by default |
 | `ios.bundleIdentifier` | Optional replacement for the shared identifier on iOS |
 | `ios.xcodeScheme` | Optional Xcode build-scheme name |
@@ -189,6 +190,53 @@ The helper returns the variant key or `null` when the identifier is missing, unk
 
 The runtime helper contains no config-plugin code and requires no native module of its own. The installed application's identifier remains the source of identity when JavaScript is reloaded or updated. A scheme change does not change bundled `EXPO_PUBLIC_*` variables or Expo's shared `extra` values.
 
+## Update channels
+
+Different application identifiers do not isolate over-the-air updates. EAS Update routes updates through a build's channel, platform, and runtime version. Use separate channels linked to separate update branches when preview and production must receive different updates.
+
+### Local native builds
+
+After [installing and configuring Expo Updates](https://docs.expo.dev/eas-update/getting-started/), add `updateChannel` to each variant that needs its own channel:
+
+```ts
+export const variants = {
+  production: {applicationId: 'com.example.app', updateChannel: 'production'},
+  development: {applicationId: 'com.example.app.dev', updateChannel: 'development'},
+  preview: {applicationId: 'com.example.app.preview', updateChannel: 'preview'},
+} satisfies NativeVariantMap;
+```
+
+Run prebuild once. Selecting an Xcode configuration or Android flavor then selects its channel without another prebuild. Channel names must start with a letter or digit and contain only letters, digits, periods, underscores, or hyphens. The option preserves other request headers and leaves the update URL, runtime version, and other update settings shared. It does not install Expo Updates, enable disabled updates, or create EAS channels and branches.
+
+When `updateChannel` is omitted, that variant inherits the shared native channel configuration. Omitting the option from every variant preserves the standard Expo and EAS workflow. Channel overrides are generated only when `updates.url` is configured and `updates.enabled` is not `false`. Android flavor manifests generated for these overrides follow the plugin's usual ownership checks; existing manually maintained flavor manifests are not overwritten.
+
+Publish with the intended variant and channel, and choose the EAS environment containing that variant's bundled environment variables:
+
+```sh
+NATIVE_VARIANT=preview eas update --channel preview --environment preview
+```
+
+`NATIVE_VARIANT` also selects the channel in the exported Expo config. It does not select the publish destination by itself. Channels control distribution; runtime versions still need to match the native code in the installed app. Verify the installed build's `Updates.channel` and an actual update before distributing it.
+
+### EAS Build
+
+[EAS Build already supports channels in build profiles](https://docs.expo.dev/build/updates/). Users building one variant per EAS job can use the profile's `channel` without setting `updateChannel`:
+
+```json
+{
+  "build": {
+    "preview": {
+      "channel": "preview",
+      "env": {"NATIVE_VARIANT": "preview"},
+      "android": {"gradleCommand": ":app:assemblePreviewRelease"},
+      "ios": {"buildConfiguration": "Release"}
+    }
+  }
+}
+```
+
+Xcode and Android Studio builds do not read EAS profiles, which is why the local workflow needs the variant option. If both are configured, an explicit `updateChannel` takes precedence during native compilation. Keep it equal to the EAS profile's channel to avoid conflicting configuration. EAS cloud builds and remote update delivery remain unverified; see [experimental EAS configuration](#experimental-eas-configuration).
+
 ## Development clients and links
 
 Each variant gets its own custom URL scheme. If using `expo-dev-client`, configure its `addGeneratedScheme` option as `false` to avoid the shared default development-client scheme. The variant's custom scheme can open its development client.
@@ -241,9 +289,9 @@ Extension support has been tested with `@bacons/apple-targets@5.0.0` using clean
 
 Expo SDK 57's default iOS template does not enable scene lifecycle support. A build linked with the iOS 27 SDK can crash on iOS 27 before JavaScript starts. Use Expo's [official scene-support configuration](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md) when targeting that combination. The example's launch tests use iOS 26.5.
 
-The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, Firebase service files, entitlements, and update channels are not supported options. Other plugins can still modify native settings, so validate integrations that touch the same files.
+The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, Firebase service files, and entitlements are not supported options. Other plugins can still modify native settings, so validate integrations that touch the same files.
 
-Remote update routing is not isolated by application identifiers alone. Configure and test update channels and runtime compatibility separately, and publish with the intended `NATIVE_VARIANT`: a downloaded update's manifest can replace the embedded Expo config. The example disables remote updates.
+Remote update routing is not isolated by application identifiers alone. Configure [update channels](#update-channels) and test runtime compatibility, and publish with the intended `NATIVE_VARIANT`: a downloaded update's manifest can replace the embedded Expo config. The example disables remote updates.
 
 EAS support remains experimental until its credential preflight and cloud artifacts have been verified. Managed EAS builds resolve app identifiers before native generation and do not select arbitrary generated iOS schemes in the same way as Xcode. Local native generation does not establish EAS compatibility.
 

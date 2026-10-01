@@ -28,6 +28,7 @@ import {
   renamedSettings,
 } from './fixture';
 import type {PrebuildSettings} from './fixture';
+import {assertUpdateChannelPrebuild} from './updateChannels';
 
 const executeFile = promisify(execFile);
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -46,6 +47,10 @@ afterAll(async () => {
 });
 
 describe('compiled package prebuild', () => {
+  it('selects update channels at native build time and reconciles optional overrides', async () => {
+    await assertUpdateChannelPrebuild(consumerRoot, runPrebuild);
+    await writeFile(path.join(consumerRoot, 'app.config.js'), APP_CONFIG, 'utf8');
+  });
   it('reconciles the full matrix across clean, repeated, and changed prebuilds', async () => {
     await writeSettings(consumerRoot, initialSettings('before'));
     await runPrebuild(consumerRoot, true);

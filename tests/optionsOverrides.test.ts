@@ -11,6 +11,14 @@ function normalize(variant: object) {
 }
 
 describe('optional native and icon overrides', () => {
+  it('keeps explicit update channels optional and allows shared channels', () => {
+    expect(normalize({updateChannel: 'preview-v2'}).selectedVariant.updateChannel).toBe('preview-v2');
+    expect(normalize({}).selectedVariant).not.toHaveProperty('updateChannel');
+    expect(normalizeNativeVariants({configName: 'Acme', options: {variants: {
+      one: {applicationId: 'com.acme.one', updateChannel: 'shared'},
+      two: {applicationId: 'com.acme.two', updateChannel: 'shared'},
+    }}}).variants.map(({updateChannel}) => updateChannel)).toEqual(['shared', 'shared']);
+  });
   it('honors explicit flavor, configurations, and scheme names', () => {
     expect(
       normalize({
@@ -37,6 +45,10 @@ describe('optional native and icon overrides', () => {
     [{ios: {debugConfiguration: 'Debug'}}, 'standard Debug'],
     [{ios: {releaseConfiguration: '../Release'}}, 'path-safe'],
     [{icon: ''}, 'image path'],
+    [{updateChannel: ''}, 'nonempty string'],
+    [{updateChannel: 42}, 'nonempty string'],
+    [{updateChannel: 'preview\nproduction'}, 'updateChannel'],
+    [{updateChannel: '$(CHANNEL)'}, 'updateChannel'],
     [{ios: {icon: 'App.icon'}}, 'Icon Composer'],
     [{ios: {icon: {}}}, 'at least one'],
     [{ios: {icon: {light: 'icon.png', typo: true}}}, 'unknown key'],

@@ -1,5 +1,17 @@
 # Validation record
 
+## Per-variant update channel validation, October 1, 2026
+
+The optional `updateChannel` setting was checked with Expo 57.0.24, Xcode 27.0 build 27A266a, Gradle 9.3.1, Android Gradle plugin 8.12.0, and Java 17.0.20.1.
+
+Compiled-package prebuild tests cover separate production and preview channels, a variant inheriting shared settings, repeated non-clean prebuilds, channel changes and removal, disabled updates, and protection against manual edits. Config-export tests cover `NATIVE_VARIANT` and the actual native build identity. The iOS build script also runs against real plist files, including a simulated EAS channel edit after prebuild.
+
+Minimal native resource fixtures built all three release variants from one generated project. Xcode simulator builds produced `Expo.plist` with `preview`, `production`, and the inherited `eas-profile` channel. Android builds produced APK manifests with the same channels, checked inside the packaged artifacts. Every variant retained the shared custom request header.
+
+These checks establish native channel selection and packaging. Full React Native app builds, installed `expo-updates` runtime behavior, EAS cloud builds, and live OTA delivery were not exercised for this feature.
+
+## Original release validation
+
 This records checks performed from September 19 through 21, 2026 for the published `0.1.0` release and the `0.2.0-alpha.0` prerelease.
 
 ## Build environment

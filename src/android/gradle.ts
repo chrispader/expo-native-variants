@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 
 import type {NormalizedNativeVariantsOptions} from '../options';
 import {createExpoConfigGradle} from './expoConfig';
+import {createUpdateChannelsGradle} from './updates';
 
 const PLUGIN_NAME = 'expo-native-variants';
 const REACT_BLOCK_NAME = 'react';
@@ -23,6 +24,7 @@ interface NamedBlock {
 export function reconcileAppBuildGradle(
     source: string,
     options: NormalizedNativeVariantsOptions,
+    updatesEnabled = false,
 ): string {
     const withoutAndroidBlock = removeManagedBlock(source, ANDROID_BLOCK_NAME);
     const androidBlock = findNamedBlock(withoutAndroidBlock.source, ANDROID_BLOCK_NAME);
@@ -51,7 +53,7 @@ export function reconcileAppBuildGradle(
         reactContent,
         encodeMetadata(existingDebuggableVariants),
     );
-    const androidContent = createAndroidContent(options);
+    const androidContent = createAndroidContent(options, updatesEnabled);
 
     return insertManagedContent(withReactContent, ANDROID_BLOCK_NAME, androidContent, '');
 }
@@ -111,7 +113,10 @@ function findDirectChildBlockNames(source: string): readonly string[] {
     return names;
 }
 
-function createAndroidContent(options: NormalizedNativeVariantsOptions): string {
+function createAndroidContent(
+    options: NormalizedNativeVariantsOptions,
+    updatesEnabled: boolean,
+): string {
     const flavors = options.variants
         .map(
             ({androidApplicationId, androidFlavor, urlScheme}) => `        ${androidFlavor} {
@@ -127,7 +132,7 @@ function createAndroidContent(options: NormalizedNativeVariantsOptions): string 
 ${flavors}
     }
 
-${createExpoConfigGradle(options)}`;
+${createExpoConfigGradle(options)}${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
 }
 
 function quoteGroovy(value: string): string {
