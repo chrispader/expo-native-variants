@@ -9,6 +9,7 @@ import {
 } from './infoPlist';
 
 import {applyIosIconBuildSettings} from '../icons/resolve';
+import {UPDATE_CHANNEL_BUILD_SETTING} from './updates';
 
 const MANAGED_BUILD_SETTING = 'EXPO_NATIVE_VARIANTS_MANAGED';
 const APPLICATION_IDENTIFIER_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER';
@@ -435,6 +436,11 @@ function applyVariantSettings(
   if (owner.type === 'application') {
     configuration.buildSettings[DISPLAY_NAME_BUILD_SETTING] = quote(variant.displayName);
     configuration.buildSettings[URL_SCHEME_BUILD_SETTING] = quote(variant.urlScheme);
+    if (variant.updateChannel === undefined) {
+      delete configuration.buildSettings[UPDATE_CHANNEL_BUILD_SETTING];
+    } else {
+      configuration.buildSettings[UPDATE_CHANNEL_BUILD_SETTING] = quote(variant.updateChannel);
+    }
     applyIosIconBuildSettings(configuration.buildSettings, variant);
   } else {
     delete configuration.buildSettings[DISPLAY_NAME_BUILD_SETTING];

@@ -1,4 +1,5 @@
 import {writeFile} from 'node:fs/promises';
+import path from 'node:path';
 
 import type {ConfigPlugin} from 'expo/config-plugins';
 
@@ -9,6 +10,9 @@ import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
 import {updatePodfile} from './podfile';
 import {syncSchemeFilesMod} from './schemeFiles';
 import {getXcodeProjectMetadata, updateXcodeProject} from './xcodeProject';
+import {reconcileIosUpdateChannelPhase} from './updates';
+import {restoreSharedUpdateChannel} from '../updates';
+import type {NativeUpdateChannels} from '../updates';
 
 const {
   IOSConfig,
@@ -16,13 +20,15 @@ const {
   withDangerousMod,
   withFinalizedMod,
   withInfoPlist,
+  withExpoPlist,
   withPodfile,
 } = configPlugins;
 
-export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
-  config,
-  options,
-) => {
+export const withIosVariants = (
+  config: Parameters<ConfigPlugin>[0],
+  options: NormalizedNativeVariantsOptions,
+  updates: NativeUpdateChannels,
+): ReturnType<ConfigPlugin> => {
   const expoSchemes = [
     `exp+${config.slug}`,
     ...options.variants.map((variant) => variant.iosBundleIdentifier),
@@ -53,6 +59,21 @@ export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
     });
     return modConfig;
   });
+
+  if (updates.enabled) {
+    config = withExpoPlist(config, (modConfig) => {
+      const headers = restoreSharedUpdateChannel(
+        modConfig.modResults.EXUpdatesRequestHeaders ?? {},
+        updates,
+      );
+      if (Object.keys(headers).length === 0) {
+        delete modConfig.modResults.EXUpdatesRequestHeaders;
+      } else {
+        modConfig.modResults.EXUpdatesRequestHeaders = headers;
+      }
+      return modConfig;
+    });
+  }
 
   config = withDangerousMod(config, ['ios', async (modConfig) => {
     if (!modConfig.modRequest.introspect) {
@@ -85,7 +106,16 @@ export const withIosVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
     const project = IOSConfig.XcodeUtils.getPbxproj(
       modConfig.modRequest.projectRoot,
     );
-    updateXcodeProject(project, options);
+    const metadata = updateXcodeProject(project, options);
+    reconcileIosUpdateChannelPhase({
+      project,
+      targetUuid: metadata.targetUuid,
+      expoPlistPath: `$(SRCROOT)/${path.relative(
+        modConfig.modRequest.platformProjectRoot,
+        IOSConfig.Paths.getExpoPlistPath(modConfig.modRequest.projectRoot),
+      )}`,
+      enabled: updates.enabled,
+    });
     await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;
   }]);

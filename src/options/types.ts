@@ -43,6 +43,8 @@ export type NativeVariantOptions = Readonly<{
   icon?: string;
   displayName?: string;
   urlScheme?: string;
+  /** Native Expo Updates channel. Omit to inherit the shared or EAS configuration. */
+  updateChannel?: string;
   runMode?: NativeVariantRunMode;
   ios?: NativeVariantIosOptions;
   android?: NativeVariantAndroidOptions;
@@ -68,6 +70,7 @@ export type NormalizedNativeVariant = Readonly<{
   iosBundleIdentifier: string;
   androidApplicationId: string;
   urlScheme: string;
+  updateChannel?: string;
   runMode: NativeVariantRunMode;
   iosScheme: string;
   debugConfiguration: string;

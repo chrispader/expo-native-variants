@@ -20,6 +20,7 @@ const VARIANT_KEYS = new Set([
   'ios',
   'runMode',
   'urlScheme',
+  'updateChannel',
 ]);
 const IOS_KEYS = new Set([
   'bundleIdentifier',
@@ -145,6 +146,15 @@ function normalizeVariant({
   const urlScheme =
     optionalNonemptyString(variantRecord.urlScheme, `Variant "${key}" urlScheme`) ?? applicationId;
   validateUrlScheme(urlScheme, `Variant "${key}" urlScheme`);
+  const updateChannel = optionalNonemptyString(
+    variantRecord.updateChannel,
+    `Variant "${key}" updateChannel`,
+  );
+  if (updateChannel !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(updateChannel)) {
+    throw new Error(
+      `Variant "${key}" updateChannel must start with a letter or digit and contain only letters, digits, periods, underscores, or hyphens.`,
+    );
+  }
   const runMode = readRunMode(variantRecord.runMode, key);
   const ios = readIosOptions(variantRecord.ios, key);
   const android = readAndroidOptions(variantRecord.android, key);
@@ -190,6 +200,7 @@ function normalizeVariant({
     debugConfiguration,
     releaseConfiguration,
     androidFlavor,
+    ...(updateChannel === undefined ? {} : {updateChannel}),
     ...(icon === undefined ? {} : {icon}),
     ...(ios.icon === undefined ? {} : {iosIcon: ios.icon}),
     ...(android.icon === undefined ? {} : {androidIcon: android.icon}),

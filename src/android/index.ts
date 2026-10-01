@@ -6,6 +6,8 @@ import type {NormalizedNativeVariantsOptions} from '../options';
 import {reconcileAppBuildGradle} from './gradle';
 import {reconcileAndroidManifest} from './manifest';
 import {reconcileAndroidVariantResources} from './resources';
+import {restoreAndroidUpdateChannel, syncAndroidUpdateChannelManifests} from './updates';
+import type {NativeUpdateChannels} from '../updates';
 
 const {
     WarningAggregator,
@@ -14,10 +16,11 @@ const {
     withDangerousMod,
 } = configPlugins;
 
-export const withAndroidVariants: ConfigPlugin<NormalizedNativeVariantsOptions> = (
-    config,
-    options,
-) => {
+export const withAndroidVariants = (
+    config: Parameters<ConfigPlugin>[0],
+    options: NormalizedNativeVariantsOptions,
+    updates: NativeUpdateChannels,
+): ReturnType<ConfigPlugin> => {
     const fallbackSchemes = collectExpoFallbackSchemes(config, options);
 
     let nextConfig = withAppBuildGradle(config, (modConfig) => {
@@ -29,6 +32,7 @@ export const withAndroidVariants: ConfigPlugin<NormalizedNativeVariantsOptions> 
         modConfig.modResults.contents = reconcileAppBuildGradle(
             modConfig.modResults.contents,
             options,
+            updates.enabled,
         );
         return modConfig;
     });
@@ -39,6 +43,9 @@ export const withAndroidVariants: ConfigPlugin<NormalizedNativeVariantsOptions> 
             fallbackSchemes,
         });
         modConfig.modResults = result.manifest;
+        if (updates.enabled) {
+            restoreAndroidUpdateChannel(modConfig.modResults, updates);
+        }
         for (const scheme of result.sharedSchemes) {
             WarningAggregator.addWarningAndroid(
                 'expo-native-variants',
@@ -60,6 +67,11 @@ export const withAndroidVariants: ConfigPlugin<NormalizedNativeVariantsOptions> 
             await reconcileAndroidVariantResources(
                 modConfig.modRequest.platformProjectRoot,
                 options,
+            );
+            await syncAndroidUpdateChannelManifests(
+                modConfig.modRequest.platformProjectRoot,
+                options,
+                updates.enabled,
             );
             return modConfig;
         },
