@@ -88,7 +88,7 @@ function collectExpoFallbackSchemes(
 ): ReadonlySet<string> {
     return new Set([
         ...options.variants.map(({urlScheme}) => urlScheme),
-        options.selectedVariant.androidApplicationId,
+        ...options.variants.map(({androidApplicationId}) => androidApplicationId),
         `exp+${config.slug}`,
     ]);
 }
