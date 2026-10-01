@@ -108,6 +108,36 @@ describe(reconcileIosUpdateChannelPhase, () => {
       project: first, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: true,
     })).toThrow('Invalid native update channel build phase.');
   });
+
+  it('removes every owned phase when more than one is present', async () => {
+    const root = await writeProject();
+    const first = load(root);
+    reconcileIosUpdateChannelPhase({project: first, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: true});
+    await save(root, first);
+
+    const duplicated = load(root);
+    const [phase] = channelPhases(duplicated);
+    const target = duplicated.pbxNativeTargetSection()[TARGET] as {buildPhases: {value: string; comment: string}[]};
+    shellPhases(duplicated).DUPLICATE_PHASE = {...phase};
+    shellPhases(duplicated).DUPLICATE_PHASE_comment = UPDATE_CHANNEL_PHASE;
+    target.buildPhases.push({value: 'DUPLICATE_PHASE', comment: UPDATE_CHANNEL_PHASE});
+    expect(channelPhases(duplicated)).toHaveLength(2);
+
+    reconcileIosUpdateChannelPhase({project: duplicated, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: false});
+    expect(channelPhases(duplicated)).toHaveLength(0);
+    expect(targetPhaseComments(duplicated)).toEqual(['Sources', 'Bundle React Native code and images']);
+  });
+
+  it('rejects a missing target and a target without build phases', async () => {
+    const project = load(await writeProject());
+    expect(() => reconcileIosUpdateChannelPhase({
+      project, targetUuid: 'MISSING', expoPlistPath: EXPO_PLIST, enabled: true,
+    })).toThrow('Invalid Xcode application target.');
+    delete (project.pbxNativeTargetSection()[TARGET] as {buildPhases?: unknown}).buildPhases;
+    expect(() => reconcileIosUpdateChannelPhase({
+      project, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: true,
+    })).toThrow('Invalid Xcode build phases.');
+  });
 });
 
 function load(root: string) {
