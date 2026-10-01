@@ -59,7 +59,12 @@ export function reconcileIosUpdateChannelPhase({
 
 function assertOwnedScript(value: unknown): void {
   if (typeof value !== 'string') throw new Error('Invalid native update channel build phase.');
-  const script: unknown = JSON.parse(value);
+  let script: unknown;
+  try {
+    script = JSON.parse(value);
+  } catch {
+    // An unquoted pbxproj token is a hand edit, not our JSON-quoted script.
+  }
   if (typeof script === 'string') {
     const newline = script.indexOf('\n');
     if (script.slice(0, newline) === `# expo-native-variants:updates ${hash(script.slice(newline + 1))}`) {

@@ -128,6 +128,19 @@ describe(reconcileIosUpdateChannelPhase, () => {
     expect(targetPhaseComments(duplicated)).toEqual(['Sources', 'Bundle React Native code and images']);
   });
 
+  it('reports a modified phase when the script is an unquoted pbxproj token', async () => {
+    const root = await writeProject();
+    const first = load(root);
+    reconcileIosUpdateChannelPhase({project: first, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: true});
+    const [phase] = channelPhases(first);
+    if (phase === undefined) throw new Error('phase missing');
+    phase.shellScript = 'echo_by_hand';
+    expect(() => reconcileIosUpdateChannelPhase({
+      project: first, targetUuid: TARGET, expoPlistPath: EXPO_PLIST, enabled: false,
+    })).toThrow('will not replace a modified update channel build phase');
+    expect(channelPhases(first)).toHaveLength(1);
+  });
+
   it('rejects a missing target and a target without build phases', async () => {
     const project = load(await writeProject());
     expect(() => reconcileIosUpdateChannelPhase({
