@@ -14,7 +14,7 @@ Release maintainers can find the automated process in [RELEASING.md](./RELEASING
 Install `expo-native-variants` in your Expo project and add it to the `plugins` array in your app config. Each variant only requires a complete application identifier. Declare the primary variant first.
 
 ```sh
-bun add expo-native-variants
+npm install expo-native-variants
 ```
 
 ```ts
@@ -22,14 +22,14 @@ import type {ExpoConfig} from 'expo/config';
 import type {NativeVariantMap} from 'expo-native-variants';
 
 export const variants = {
-  production: {applicationId: 'com.acme.app'},
-  development: {applicationId: 'com.acme.app.dev'},
-  preview: {applicationId: 'com.acme.app.preview'},
+  production: {applicationId: 'com.example.app'},
+  development: {applicationId: 'com.example.app.dev'},
+  preview: {applicationId: 'com.example.app.preview'},
 } satisfies NativeVariantMap;
 
 export default {
-  name: 'Acme',
-  slug: 'acme',
+  name: 'MyApp',
+  slug: 'my-app',
   plugins: [['expo-native-variants', {variants}]],
 } satisfies ExpoConfig;
 ```
@@ -42,16 +42,16 @@ expo prebuild --clean
 
 | Variant | Xcode scheme | Xcode configurations | Android variants |
 | --- | --- | --- | --- |
-| development | `Acme-Development` | `Debug-Development`, `Release-Development` | `developmentDebug`, `developmentRelease` |
-| preview | `Acme-Preview` | `Debug-Preview`, `Release-Preview` | `previewDebug`, `previewRelease` |
-| production | `Acme-Production` | `Debug-Production`, `Release-Production` | `productionDebug`, `productionRelease` |
+| development | `MyApp-Development` | `Debug-Development`, `Release-Development` | `developmentDebug`, `developmentRelease` |
+| preview | `MyApp-Preview` | `Debug-Preview`, `Release-Preview` | `previewDebug`, `previewRelease` |
+| production | `MyApp-Production` | `Debug-Production`, `Release-Production` | `productionDebug`, `productionRelease` |
 
 Choose a scheme in the iOS workspace or a build variant in Android Studio. Every variant supports debug and release builds. A debug build and a release build of the same variant share an identifier, so installing one replaces the other.
 
 For Android, Expo CLI also accepts explicit variant and application selection:
 
 ```sh
-expo run:android --variant developmentDebug --app-id com.acme.app.dev
+expo run:android --variant developmentDebug --app-id com.example.app.dev
 ```
 
 On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinary `Debug` configuration unless one is specified, and its environment-mode handling checks for the literal name `Release`. Selecting a custom scheme alone does not reliably select its configured build mode.
@@ -86,15 +86,15 @@ Put each icon next to its variant. Selecting an Xcode configuration or Android f
 ```ts
 export const variants = {
   production: {
-    applicationId: 'com.acme.app',
+    applicationId: 'com.example.app',
     icon: './assets/production.png',
   },
   development: {
-    applicationId: 'com.acme.app.dev',
+    applicationId: 'com.example.app.dev',
     icon: './assets/development.png',
   },
   preview: {
-    applicationId: 'com.acme.app.preview',
+    applicationId: 'com.example.app.preview',
     icon: './assets/preview.png',
   },
 } satisfies NativeVariantMap;
@@ -104,7 +104,7 @@ Platform-specific overrides are optional:
 
 ```ts
 preview: {
-  applicationId: 'com.acme.app.preview',
+  applicationId: 'com.example.app.preview',
   icon: './assets/preview.png',
   ios: {
     icon: {
@@ -137,22 +137,22 @@ import type {NativeVariantsOptions} from 'expo-native-variants';
 const options = {
   ios: {
     targets: {
-      AcmeShare: {bundleIdentifierSuffix: '.share'},
-      AcmeWidget: {bundleIdentifierSuffix: '.widget'},
+      MyAppShare: {bundleIdentifierSuffix: '.share'},
+      MyAppWidget: {bundleIdentifierSuffix: '.widget'},
     },
   },
   variants: {
     production: {
-      applicationId: 'com.acme.app',
+      applicationId: 'com.example.app',
     },
     development: {
-      applicationId: 'com.acme.app.dev',
+      applicationId: 'com.example.app.dev',
     },
   },
 } satisfies NativeVariantsOptions;
 ```
 
-This produces `com.acme.app.share` and `com.acme.app.dev.share` for `AcmeShare`, plus the corresponding widget identifiers. The target-generating plugin remains responsible for creating targets, source files, build phases, frameworks, plist files, and entitlements. Register that plugin before `expo-native-variants`, and keep `expo-native-variants` last in the plugin list.
+This produces `com.example.app.share` and `com.example.app.dev.share` for `MyAppShare`, plus the corresponding widget identifiers. The target-generating plugin remains responsible for creating targets, source files, build phases, frameworks, plist files, and entitlements. Register that plugin before `expo-native-variants`, and keep `expo-native-variants` last in the plugin list.
 
 Keep each suffix equal to the suffix in the target generator's own configuration. `expo-native-variants` validates and applies the resulting identifiers but does not rewrite that plugin's configuration.
 
@@ -166,7 +166,7 @@ const applicationGroups = [
 ];
 ```
 
-For example, pass that array through `ios.entitlements` for the app and through the extension generator's entitlements configuration. Xcode expands it to the main application bundle identifier for each configuration, so an extension and its containing app share `group.com.acme.app.dev` in development and `group.com.acme.app` in production.
+For example, pass that array through `ios.entitlements` for the app and through the extension generator's entitlements configuration. Xcode expands it to the main application bundle identifier for each configuration, so an extension and its containing app share `group.com.example.app.dev` in development and `group.com.example.app` in production.
 
 Variant keys determine the Android flavor names and generated iOS configuration names. Identifiers must be unique on each platform. The plugin rejects invalid names and collisions before generating native settings.
 
@@ -204,7 +204,7 @@ Native builds automatically supply their identity when generating the embedded E
 A Metro server still serves one shared Expo manifest. Start it with `NATIVE_VARIANT` for the app you are developing. Keep the explicit `--scheme` as well: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
 
 ```sh
-NATIVE_VARIANT=development expo start --dev-client --scheme acme-dev
+NATIVE_VARIANT=development expo start --dev-client --scheme com.example.app.dev
 ```
 
 The Android development launcher also registers its own fixed `expo-dev-launcher` authentication scheme. That upstream callback remains shared when several debug clients are installed. The plugin preserves it and emits a warning. Use each variant's configured URL scheme for application links and development-client launch URLs.
@@ -249,9 +249,9 @@ EAS support remains experimental until its credential preflight and cloud artifa
 
 ## Example and development
 
-The [example](./example) contains three variants and displays the installed identifier, resolved variant, and debug/release mode. Install the repository dependencies, build the package, generate the example's native projects, and open its iOS workspace or Android project.
+The [example](./example) contains three variants and displays the installed identifier, resolved variant, and debug/release mode. Install the repository dependencies with `npm install`, build the package, generate the example's native projects, and open its iOS workspace or Android project.
 
-This repository uses Bun 1.3.1. The root package scripts provide `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
+Run the root package scripts with `npm run <script>`. Available scripts include `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
 
 ## License
 
