@@ -59,9 +59,13 @@ export async function syncIosLocalizedNames({
   options: NormalizedNativeVariantsOptions;
 }>): Promise<void> {
   const files = new Map<string, Buffer>();
+  if (collectLocalizedLanguages(options).length === 0) {
+    await syncGeneratedFiles(platformProjectRoot, STATE_FILE, files);
+    return;
+  }
+  // The phase reads one input list per variant, so every variant needs a file, even an empty one.
   for (const variant of options.variants) {
     const names = Object.entries(variant.localizedDisplayNames ?? {});
-    if (names.length === 0) continue;
     const variantRoot = `${projectDirectory}/${VARIANT_DIRECTORY}/${variant.key}`;
     const inputs: string[] = [];
     for (const [tag, name] of names) {
@@ -69,7 +73,7 @@ export async function syncIosLocalizedNames({
       files.set(relative, Buffer.from(createStringsFile(name), 'utf8'));
       inputs.push(`$(SRCROOT)/${relative}`);
     }
-    files.set(`${variantRoot}.xcfilelist`, Buffer.from(`${inputs.join('\n')}\n`, 'utf8'));
+    files.set(`${variantRoot}.xcfilelist`, Buffer.from(inputs.map((input) => `${input}\n`).join(''), 'utf8'));
   }
   await syncGeneratedFiles(platformProjectRoot, STATE_FILE, files);
 }

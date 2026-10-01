@@ -67,6 +67,21 @@ describe('findLocaleNameCollisions', () => {
     ).resolves.toEqual(['fr']);
   });
 
+  it('matches Expo locale keys to canonical variant tags', async () => {
+    const locales = {'pt-br': {app_name: 'Shared'}};
+
+    await expect(
+      findLocaleNameCollisions({
+        locales, nameKey: ANDROID_NAME_KEY, options: optionsWith(['pt-BR']), projectRoot: '/unused',
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      findLocaleNameCollisions({
+        locales, nameKey: ANDROID_NAME_KEY, options: optionsWith(['fr']), projectRoot: '/unused',
+      }),
+    ).resolves.toEqual(['pt-br']);
+  });
+
   it('reports nothing when the app has no locales or an unreadable locale file', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
     const options = optionsWith([]);

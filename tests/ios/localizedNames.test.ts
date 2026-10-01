@@ -82,7 +82,7 @@ describe('syncIosLocalizedNames', () => {
     ).resolves.toBe(`CFBundleDisplayName = "${escaped}";\n`);
   });
 
-  it('removes dropped languages and variants on rerun and writes nothing for string-only variants', async () => {
+  it('removes dropped languages and variants on rerun and writes nothing when no variant is localized', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
     const args = {platformProjectRoot: root, projectDirectory: 'Acme'};
     await syncIosLocalizedNames({...args, options: withNames({fr: 'App', ar: 'تطبيق'})});
@@ -93,6 +93,23 @@ describe('syncIosLocalizedNames', () => {
 
     await syncIosLocalizedNames({...args, options: withNames(undefined)});
     await expect(readdir(path.join(root, 'Acme'))).rejects.toMatchObject({code: 'ENOENT'});
+  });
+
+  it('writes an empty input list for a variant without localized names when another has them', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
+    const production = {...base, key: 'production', androidFlavor: 'production'};
+    await syncIosLocalizedNames({
+      platformProjectRoot: root,
+      projectDirectory: 'Acme',
+      options: withNames({fr: 'App'}, [production]),
+    });
+
+    await expect(
+      readFile(path.join(root, 'Acme', 'NativeVariants', 'production.xcfilelist'), 'utf8'),
+    ).resolves.toBe('');
+    await expect(readdir(path.join(root, 'Acme', 'NativeVariants', 'development'))).resolves.toEqual([
+      'fr.lproj',
+    ]);
   });
 });
 
