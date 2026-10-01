@@ -473,3 +473,59 @@ describe('normalizeNativeVariants', () => {
     ).toThrow(message);
   });
 });
+
+describe('localized display names', () => {
+  const normalizeProduction = (displayName: unknown) =>
+    normalizeNativeVariants({
+      configName: 'Acme',
+      options: {
+        variant: 'production',
+        variants: {production: {...variants.production, displayName}},
+      },
+    }).variants[0];
+
+  it('keeps a string display name as the default without localized names', () => {
+    const variant = normalizeProduction('Acme');
+
+    expect(variant?.displayName).toBe('Acme');
+    expect(variant).not.toHaveProperty('localizedDisplayNames');
+  });
+
+  it('splits a map into the default name and canonical per-language names', () => {
+    const variant = normalizeProduction({
+      default: 'App Dev',
+      ar: 'تطبيق (تجريبي)',
+      'pt-br': 'App Desenv',
+      'zh-Hans': '应用',
+    });
+
+    expect(variant?.displayName).toBe('App Dev');
+    expect(variant?.localizedDisplayNames).toEqual({
+      ar: 'تطبيق (تجريبي)',
+      'pt-BR': 'App Desenv',
+      'zh-Hans': '应用',
+    });
+  });
+
+  it('omits localized names when the map only has a default', () => {
+    const variant = normalizeProduction({default: 'Acme Only'});
+
+    expect(variant?.displayName).toBe('Acme Only');
+    expect(variant).not.toHaveProperty('localizedDisplayNames');
+  });
+
+  it.each([
+    [{fr: 'App Dév'}, 'must include a "default"'],
+    [{default: '', fr: 'App'}, 'displayName.default must be a nonempty'],
+    [{default: 'App', fr: ''}, 'displayName.fr must be a nonempty'],
+    [{default: 'App', 'not a tag!': 'App'}, 'displayName.not a tag! is not a valid BCP 47'],
+    [{default: 'App', fr: 'App', FR: 'App 2'}, 'duplicate'],
+    [{default: 'App', 'en-us': 'App', 'en-US': 'App 2'}, 'duplicate'],
+    [{default: 'App', Default: 'App'}, 'duplicate'],
+    [{default: 'App', fr: 'App\u0000'}, 'displayName.fr must not contain control'],
+    [{default: 'App', fr: 42}, 'displayName.fr must be a nonempty'],
+    [['App'], 'string or an object'],
+  ])('rejects invalid display name maps', (displayName, message) => {
+    expect(() => normalizeProduction(displayName)).toThrow(message);
+  });
+});

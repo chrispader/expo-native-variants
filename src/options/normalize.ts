@@ -135,10 +135,11 @@ function normalizeVariant({
   assertKnownKeys(variantRecord, VARIANT_KEYS, `Variant "${key}"`);
 
   const configLabel = toPascalConfigLabel(key);
-  const displayName =
-    optionalNonemptyString(variantRecord.displayName, `Variant "${key}" displayName`) ??
-    (isPrimary ? configName : `${configName} ${configLabel}`);
-  validateText(displayName, `Variant "${key}" displayName`);
+  const {displayName, localizedDisplayNames} = readDisplayName(
+    variantRecord.displayName,
+    key,
+    isPrimary ? configName : `${configName} ${configLabel}`,
+  );
   const applicationId = requireNonemptyString(
     variantRecord.applicationId,
     `Variant "${key}" applicationId`,
@@ -192,6 +193,7 @@ function normalizeVariant({
   return Object.freeze({
     key,
     displayName,
+    ...(localizedDisplayNames === undefined ? {} : {localizedDisplayNames}),
     iosBundleIdentifier,
     androidApplicationId,
     urlScheme,
@@ -206,6 +208,61 @@ function normalizeVariant({
     ...(android.icon === undefined ? {} : {androidIcon: android.icon}),
     ...(android.adaptiveIcon === undefined ? {} : {androidAdaptiveIcon: android.adaptiveIcon}),
   });
+}
+
+const DEFAULT_DISPLAY_NAME_KEY = 'default';
+
+function readDisplayName(
+  value: unknown,
+  variantKey: string,
+  fallback: string,
+): Readonly<{displayName: string; localizedDisplayNames?: Readonly<Record<string, string>>}> {
+  const label = `Variant "${variantKey}" displayName`;
+  if (value === undefined) {
+    return {displayName: fallback};
+  }
+  if (typeof value === 'string') {
+    validateText(requireNonemptyString(value, label), label);
+    return {displayName: value};
+  }
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be a string or an object of names by language tag.`);
+  }
+
+  const names = new Map<string, string>();
+  for (const [tag, name] of Object.entries(value)) {
+    const entryLabel = `${label}.${tag}`;
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      throw new Error(`${entryLabel} must be a nonempty string.`);
+    }
+    validateText(name, entryLabel);
+    const canonicalTag = tag === DEFAULT_DISPLAY_NAME_KEY ? tag : canonicalizeLanguageTag(tag, entryLabel);
+    if (names.has(canonicalTag)) {
+      throw new Error(`${label} contains duplicate language tag "${canonicalTag}".`);
+    }
+    names.set(canonicalTag, name);
+  }
+  const displayName = names.get(DEFAULT_DISPLAY_NAME_KEY);
+  if (displayName === undefined) {
+    throw new Error(`${label} must include a "${DEFAULT_DISPLAY_NAME_KEY}" name.`);
+  }
+  names.delete(DEFAULT_DISPLAY_NAME_KEY);
+  return names.size === 0
+    ? {displayName}
+    : {displayName, localizedDisplayNames: Object.fromEntries(names)};
+}
+
+function canonicalizeLanguageTag(tag: string, label: string): string {
+  let canonical: string | undefined;
+  try {
+    canonical = Intl.getCanonicalLocales(tag)[0];
+  } catch {
+    canonical = undefined;
+  }
+  if (canonical === undefined) {
+    throw new Error(`${label} is not a valid BCP 47 language tag.`);
+  }
+  return canonical;
 }
 
 function readIosOptions(value: unknown, variantKey: string): NativeVariantIosOptions {
