@@ -11,7 +11,6 @@ This records checks performed from September 19 through 21, 2026 for the publish
 | React Native | 0.86.3 |
 | React | 19.2.3 |
 | Node.js | 24.11.0 |
-| Bun | 1.3.1 |
 | Xcode | 27.0, build 27A266a |
 | CocoaPods | 1.17.0 |
 | Java | Temurin 17.0.20.1 |
@@ -54,7 +53,7 @@ All three experimental EAS selectors resolve the intended app-config identifiers
 
 The repository changes from September 20, 2026 add explicit iOS extension targets. Unit tests verify suffix validation, identifier collision checks, complete Debug/Release configuration cloning, canonical base configurations, stale configuration removal, and preservation of extension settings such as `SWIFT_VERSION` and `CODE_SIGN_ENTITLEMENTS`.
 
-The Expo prebuild integration creates a share extension with `@bacons/apple-targets@5.0.0`. Clean generation and regeneration pass with development, preview, production, and renamed local variants. The generated extension uses identifiers such as `com.acme.app.dev.share`, retains its Swift settings, and contains the same `group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)` entitlement placeholder as the application. The unit suite now contains 101 passing tests.
+The Expo prebuild integration creates a share extension with `@bacons/apple-targets@5.0.0`. Clean generation and regeneration pass with development, preview, production, and renamed local variants. The generated extension appends `.share` to each application's identifier, retains its Swift settings, and contains the same `group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)` entitlement placeholder as the application. The unit suite now contains 101 passing tests.
 
 On this Expo 57 toolchain, `@bacons/apple-targets@5.0.0` throws while replacing its own extension configuration list during a repeated non-clean prebuild. Clean prebuilds pass. The failure occurs in that plugin's custom Xcode mod before `expo-native-variants` runs.
 

@@ -2,7 +2,7 @@
 
 Expo's usual variant setup regenerates the native project for the selected environment. This package will generate every configured variant together, so developers can switch schemes or flavors while keeping `ios/` and `android/` generated and ignored by Git.
 
-Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub. Version `0.1.0` is published under the npm `latest` tag, and `0.2.0-alpha.0` is published under `next`. The repository uses Bun for package management.
+Status: implemented on September 19, 2026. This plan incorporates an Astra architecture assessment and checks against released packages. Implementation used GPT-5.6-Sol subagents. The source is public on GitHub. Version `0.1.0` is published under the npm `latest` tag, and `0.2.0-alpha.0` is published under `next`.
 
 ## Viability and support boundary
 
@@ -42,13 +42,13 @@ Use `expo-native-variants` as the package name and `withNativeVariants` as the p
 {
   "variants": {
     "production": {
-      "applicationId": "com.acme.app"
+      "applicationId": "com.example.app"
     },
     "development": {
-      "applicationId": "com.acme.app.dev"
+      "applicationId": "com.example.app.dev"
     },
     "preview": {
-      "applicationId": "com.acme.app.preview"
+      "applicationId": "com.example.app.preview"
     }
   }
 }
@@ -62,9 +62,9 @@ Keep environment identity separate from build mode. Every variant gets debug and
 
 | Variant | iOS configurations | Shared scheme | Android variants |
 | --- | --- | --- | --- |
-| development | `Debug-Development`, `Release-Development` | `Acme-Development` | `developmentDebug`, `developmentRelease` |
-| preview | `Debug-Preview`, `Release-Preview` | `Acme-Preview` | `previewDebug`, `previewRelease` |
-| production | `Debug-Production`, `Release-Production` | `Acme-Production` | `productionDebug`, `productionRelease` |
+| development | `Debug-Development`, `Release-Development` | `MyApp-Development` | `developmentDebug`, `developmentRelease` |
+| preview | `Debug-Preview`, `Release-Preview` | `MyApp-Preview` | `previewDebug`, `previewRelease` |
+| production | `Debug-Production`, `Release-Production` | `MyApp-Production` | `productionDebug`, `productionRelease` |
 
 Debug and release builds of the same variant share its identifier and replace each other when installed. The three environment variants can coexist.
 
