@@ -179,3 +179,26 @@ describe('reconcileAppBuildGradle', () => {
         );
     });
 });
+
+describe('reconcileAppBuildGradle block detection', () => {
+    it('ignores an android block inside a block comment', () => {
+        const source = EXPO_GRADLE.replace(
+            '\nandroid {',
+            '\n/*\nandroid {\n    namespace "old"\n}\n*/\nandroid {',
+        );
+        const result = reconcileAppBuildGradle(source, OPTIONS);
+
+        expect(result.indexOf('productFlavors')).toBeGreaterThan(result.indexOf('*/'));
+        expect(result).toContain('namespace "com.helloworld"');
+    });
+
+    it('ignores a react block inside a block comment', () => {
+        const source = EXPO_GRADLE.replace(
+            '\nreact {',
+            '\n/*\nreact {\n    old = true\n}\n*/\nreact {',
+        );
+        const result = reconcileAppBuildGradle(source, OPTIONS);
+
+        expect(result.indexOf('debuggableVariants =')).toBeGreaterThan(result.indexOf('*/'));
+    });
+});
