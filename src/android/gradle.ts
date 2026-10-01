@@ -291,15 +291,68 @@ function removeManagedBlock(
 
 function findNamedBlock(source: string, name: string): NamedBlock {
     const openingPattern = new RegExp(`^\\s*${name}\\s*\\{`, 'm');
-    const match = openingPattern.exec(source);
+    const match = openingPattern.exec(maskCommentsAndStrings(source));
     if (match === null) {
         throw new Error(`${PLUGIN_NAME} could not find the standard ${name} { } block.`);
     }
 
-    const openingBrace = source.indexOf('{', match.index);
+    const openingBrace = match.index + match[0].length - 1;
     const closingBrace = findClosingBrace(source, openingBrace);
 
     return {bodyEnd: closingBrace, bodyStart: openingBrace + 1};
+}
+
+// Blanks comments and string contents (same length, newlines kept) so a block
+// name inside either cannot be mistaken for a real block opening.
+function maskCommentsAndStrings(source: string): string {
+    let masked = '';
+    let quote: '"' | "'" | undefined;
+    let escaped = false;
+    let lineComment = false;
+    let blockComment = false;
+
+    for (let index = 0; index < source.length; index += 1) {
+        const character = source[index]!;
+        const nextCharacter = source[index + 1];
+        const blank = character === '\n' ? '\n' : ' ';
+
+        if (lineComment) {
+            lineComment = character !== '\n';
+            masked += blank;
+        } else if (blockComment) {
+            masked += blank;
+            if (character === '*' && nextCharacter === '/') {
+                blockComment = false;
+                masked += ' ';
+                index += 1;
+            }
+        } else if (quote !== undefined) {
+            if (escaped) {
+                escaped = false;
+                masked += blank;
+            } else if (character === '\\') {
+                escaped = true;
+                masked += blank;
+            } else if (character === quote) {
+                quote = undefined;
+                masked += character;
+            } else {
+                masked += blank;
+            }
+        } else if (character === '/' && (nextCharacter === '/' || nextCharacter === '*')) {
+            lineComment = nextCharacter === '/';
+            blockComment = nextCharacter === '*';
+            masked += '  ';
+            index += 1;
+        } else {
+            if (character === '"' || character === "'") {
+                quote = character;
+            }
+            masked += character;
+        }
+    }
+
+    return masked;
 }
 
 function findClosingBrace(source: string, openingBrace: number): number {
