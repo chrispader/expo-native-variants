@@ -64,6 +64,42 @@ describe('compiled package prebuild', () => {
     await assertRenamedNativeProject(consumerRoot);
   });
 
+  it('drops a stale literal applicationId scheme when the selected variant changes', async () => {
+    await writeFile(
+      path.join(consumerRoot, 'app.config.js'),
+      `
+      const {ios, ...options} = require('./variant-settings.json').options;
+      module.exports = {name: 'Acme', slug: 'acme', plugins: [['expo-native-variants', options]]};
+    `,
+    );
+    await writeSettings(consumerRoot, initialSettings('before'));
+    await runPrebuild(consumerRoot, true);
+
+    // An earlier plugin-less prebuild leaves the applicationId scheme literal.
+    const manifestPath = path.join(consumerRoot, 'android/app/src/main/AndroidManifest.xml');
+    const staleFilter =
+      '<intent-filter><action android:name="android.intent.action.VIEW"/>' +
+      '<category android:name="android.intent.category.DEFAULT"/>' +
+      '<category android:name="android.intent.category.BROWSABLE"/>' +
+      '<data android:scheme="acme"/><data android:scheme="com.acme.app"/></intent-filter>';
+    const seeded = (await readFile(manifestPath, 'utf8')).replace(
+      '</activity>',
+      `${staleFilter}</activity>`,
+    );
+    await writeFile(manifestPath, seeded, 'utf8');
+
+    const switched = initialSettings('before');
+    await writeSettings(consumerRoot, {
+      ...switched,
+      options: {...switched.options, variant: 'development'},
+    });
+    await runPrebuild(consumerRoot, false);
+
+    const manifest = await readFile(manifestPath, 'utf8');
+    expect(manifest).not.toContain('android:scheme="com.acme.app"');
+    expect(count(manifest, '${nativeVariantScheme}')).toBe(1);
+  });
+
   it('updates schemes and owned icons during non-clean prebuild without extension plugins', async () => {
     await writeFile(
       path.join(consumerRoot, 'app.config.js'),
