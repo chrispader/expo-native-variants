@@ -1,4 +1,4 @@
-import {mkdtemp, mkdir, readFile, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, readFile, readdir, writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -105,6 +105,80 @@ describe('reconcileAndroidVariantResources', () => {
             /already defines app_name/,
         );
     });
+
+    describe('localized names', () => {
+        const localized = (
+            names: Readonly<Record<string, string>>,
+            displayName = 'App Dev',
+        ): NormalizedNativeVariantsOptions => ({
+            ...OPTIONS,
+            variants: [{...OPTIONS.variants[0]!, displayName, localizedDisplayNames: names}, OPTIONS.variants[1]!],
+        });
+
+        it('writes one app_name-only resource per language with BCP 47 qualifiers', async () => {
+            const root = await createAndroidProjectRoot();
+            await reconcileAndroidVariantResources(
+                root,
+                localized({fr: 'App Dév', 'zh-Hans': '应用', 'pt-BR': 'App Desenv'}),
+            );
+
+            const resRoot = path.join(root, 'app', 'src', 'development', 'res');
+            await expect(listSorted(resRoot)).resolves.toEqual([
+                'values',
+                'values-b+fr',
+                'values-b+pt+BR',
+                'values-b+zh+Hans',
+            ]);
+            await expect(readLocalized(root, 'values-b+zh+Hans')).resolves.toContain(
+                '<resources>\n    <string name="app_name">应用</string>\n</resources>',
+            );
+            await expect(readLocalized(root, 'values-b+fr')).resolves.not.toMatch(/<string name="(?!app_name)/);
+            await expect(readdir(path.join(root, 'app', 'src', 'production', 'res'))).resolves.toEqual(['values']);
+        });
+
+        it.each([
+            ["L'App", "L\\'App"],
+            ['A & B <b>', 'A &amp; B &lt;b&gt;'],
+            ['@Acme', '\\@Acme'],
+            ['?Acme', '\\?Acme'],
+            ['Say "hi"', 'Say \\"hi\\"'],
+            ['Back\\slash', 'Back\\\\slash'],
+        ])('escapes %s for Android string resources', async (name, escaped) => {
+            const root = await createAndroidProjectRoot();
+            await reconcileAndroidVariantResources(root, localized({fr: name}, name));
+
+            await expect(readLocalized(root, 'values-b+fr')).resolves.toContain(
+                `<string name="app_name">${escaped}</string>`,
+            );
+            await expect(readFile(resourceFile(root, 'development'), 'utf8')).resolves.toContain(
+                `<string name="app_name">${escaped}</string>`,
+            );
+        });
+
+        it('removes languages that are no longer configured and keeps the rest', async () => {
+            const root = await createAndroidProjectRoot();
+            await reconcileAndroidVariantResources(root, localized({fr: 'App Dév', ar: 'تطبيق'}));
+            await reconcileAndroidVariantResources(root, localized({ar: 'تطبيق'}));
+
+            const resRoot = path.join(root, 'app', 'src', 'development', 'res');
+            await expect(listSorted(resRoot)).resolves.toEqual(['values', 'values-b+ar']);
+            await reconcileAndroidVariantResources(root, OPTIONS);
+            await expect(listSorted(resRoot)).resolves.toEqual(['values']);
+        });
+
+        it('refuses to overwrite an edited localized resource', async () => {
+            const root = await createAndroidProjectRoot();
+            await reconcileAndroidVariantResources(root, localized({fr: 'App Dév'}));
+            const file = path.join(
+                root, 'app', 'src', 'development', 'res', 'values-b+fr', 'native_variants.xml',
+            );
+            await writeFile(file, '<resources/>', 'utf8');
+
+            await expect(
+                reconcileAndroidVariantResources(root, localized({fr: 'App Dév'})),
+            ).rejects.toThrow(/not an unmodified generated file/);
+        });
+    });
 });
 
 async function createAndroidProjectRoot(): Promise<string> {
@@ -115,4 +189,15 @@ async function createAndroidProjectRoot(): Promise<string> {
 
 function resourceFile(root: string, flavor: string): string {
     return path.join(root, 'app', 'src', flavor, 'res', 'values', 'native_variants.xml');
+}
+
+async function readLocalized(root: string, directory: string): Promise<string> {
+    return readFile(
+        path.join(root, 'app', 'src', 'development', 'res', directory, 'native_variants.xml'),
+        'utf8',
+    );
+}
+
+async function listSorted(directory: string): Promise<string[]> {
+    return (await readdir(directory)).sort();
 }

@@ -2,9 +2,11 @@ import {createHash} from 'node:crypto';
 import {mkdir, readFile, readdir, rmdir, unlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
+import {syncGeneratedFiles} from '../files/generated';
 import type {NormalizedNativeVariantsOptions} from '../options';
 
 const GENERATED_FILE_NAME = 'native_variants.xml';
+const LOCALIZED_STATE_FILE = '.expo-native-variants-localized-names.json';
 const MARKER_PREFIX = 'expo-native-variants:generated ';
 
 export async function reconcileAndroidVariantResources(
@@ -23,10 +25,35 @@ export async function reconcileAndroidVariantResources(
         await mkdir(valuesDirectory, {recursive: true});
         await writeFile(filePath, createResourceFile(variant.displayName), 'utf8');
     }
+    await syncGeneratedFiles(
+        androidProjectRoot,
+        LOCALIZED_STATE_FILE,
+        createLocalizedResourceFiles(options),
+    );
+}
+
+function createLocalizedResourceFiles(
+    options: NormalizedNativeVariantsOptions,
+): ReadonlyMap<string, Buffer> {
+    const files = new Map<string, Buffer>();
+    for (const variant of options.variants) {
+        for (const [tag, name] of Object.entries(variant.localizedDisplayNames ?? {})) {
+            const qualifier = `b+${tag.replaceAll('-', '+')}`;
+            files.set(
+                `app/src/${variant.androidFlavor}/res/values-${qualifier}/${GENERATED_FILE_NAME}`,
+                Buffer.from(createAppNameXml(name), 'utf8'),
+            );
+        }
+    }
+    return files;
+}
+
+function createAppNameXml(displayName: string): string {
+    return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">${escapeAndroidString(displayName)}</string>\n</resources>\n`;
 }
 
 function createResourceFile(displayName: string): string {
-    const body = `<resources>\n    <string name="app_name">${escapeXml(displayName)}</string>\n</resources>\n`;
+    const body = `<resources>\n    <string name="app_name">${escapeAndroidString(displayName)}</string>\n</resources>\n`;
     const hash = hashContent(body);
     return `<?xml version="1.0" encoding="utf-8"?>\n<!-- ${MARKER_PREFIX}${hash} -->\n${body}`;
 }
@@ -149,11 +176,14 @@ function hashContent(content: string): string {
     return createHash('sha256').update(content).digest('hex').slice(0, 16);
 }
 
-function escapeXml(value: string): string {
+/** Escape for aapt2 string resources (backslash rules), then for XML text. */
+function escapeAndroidString(value: string): string {
     return value
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "\\'")
+        .replaceAll('"', '\\"')
+        .replace(/^[@?]/, '\\$&')
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&apos;');
+        .replaceAll('>', '&gt;');
 }

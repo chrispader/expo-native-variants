@@ -5,8 +5,18 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
 import {syncIosIcons} from '../icons/ios';
+import {
+  describeLocaleNameCollision,
+  findLocaleNameCollisions,
+  IOS_NAME_KEY,
+} from '../localesCollision';
 import type {NormalizedNativeVariantsOptions} from '../options';
 import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
+import {
+  collectLocalizedLanguages,
+  reconcileIosLocalizedNamesPhase,
+  syncIosLocalizedNames,
+} from './localizedNames';
 import {updatePodfile} from './podfile';
 import {syncSchemeFilesMod} from './schemeFiles';
 import {getXcodeProjectMetadata, updateXcodeProject} from './xcodeProject';
@@ -40,6 +50,7 @@ export const withIosVariants = (
       infoPlist: modConfig.modResults,
       options,
       expoSchemes,
+      existingLocalizations: Object.keys(config.locales ?? {}),
     });
     const sharedSchemes = findSharedUrlSchemes(modConfig.modResults);
     if (sharedSchemes.length > 0) {
@@ -83,6 +94,23 @@ export const withIosVariants = (
         requireProjectName(modConfig.modRequest.projectName),
         options,
       );
+      await syncIosLocalizedNames({
+        platformProjectRoot: modConfig.modRequest.platformProjectRoot,
+        projectDirectory: requireProjectName(modConfig.modRequest.projectName),
+        options,
+      });
+      const collisions = await findLocaleNameCollisions({
+        locales: config.locales,
+        nameKey: IOS_NAME_KEY,
+        options,
+        projectRoot: modConfig.modRequest.projectRoot,
+      });
+      if (collisions.length > 0) {
+        WarningAggregator.addWarningIOS(
+          'expo-native-variants',
+          describeLocaleNameCollision(collisions, IOS_NAME_KEY),
+        );
+      }
     }
     const project = IOSConfig.XcodeUtils.getPbxproj(modConfig.modRequest.projectRoot);
     const metadata = getXcodeProjectMetadata(project);
@@ -115,6 +143,12 @@ export const withIosVariants = (
         IOSConfig.Paths.getExpoPlistPath(modConfig.modRequest.projectRoot),
       )}`,
       enabled: updates.enabled,
+    });
+    reconcileIosLocalizedNamesPhase({
+      project,
+      targetUuid: metadata.targetUuid,
+      projectDirectory: requireProjectName(modConfig.modRequest.projectName),
+      enabled: collectLocalizedLanguages(options).length > 0,
     });
     await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;

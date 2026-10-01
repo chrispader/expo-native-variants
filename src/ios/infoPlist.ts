@@ -1,4 +1,5 @@
 import type {NormalizedNativeVariantsOptions} from '../options';
+import {collectLocalizedLanguages} from './localizedNames';
 
 export const DISPLAY_NAME_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_DISPLAY_NAME';
 export const URL_SCHEME_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_URL_SCHEME';
@@ -12,12 +13,15 @@ type UpdateInfoPlistArgs = Readonly<{
   infoPlist: PlistDictionary;
   options: NormalizedNativeVariantsOptions;
   expoSchemes: readonly string[];
+  /** Languages the app already ships, for example from Expo `locales`. */
+  existingLocalizations?: readonly string[];
 }>;
 
 export function updateInfoPlist({
   infoPlist,
   options,
   expoSchemes,
+  existingLocalizations = [],
 }: UpdateInfoPlistArgs): PlistDictionary {
   const replacedSchemes = new Set([
     ...options.variants.map((variant) => variant.urlScheme),
@@ -38,6 +42,7 @@ export function updateInfoPlist({
 
   return {
     ...infoPlist,
+    ...readLocalizations(infoPlist, options, existingLocalizations),
     CFBundleDisplayName: `$(${DISPLAY_NAME_BUILD_SETTING})`,
     CFBundleURLTypes: [
       ...preservedUrlTypes,
@@ -48,6 +53,32 @@ export function updateInfoPlist({
           '$(PRODUCT_BUNDLE_IDENTIFIER)',
         ],
       },
+    ],
+  };
+}
+
+/**
+ * Once CFBundleLocalizations exists, iOS only matches the languages it lists, so it must keep every
+ * language the app already ships.
+ */
+function readLocalizations(
+  infoPlist: PlistDictionary,
+  options: NormalizedNativeVariantsOptions,
+  existingLocalizations: readonly string[],
+): PlistDictionary {
+  const languages = collectLocalizedLanguages(options);
+  if (languages.length === 0) {
+    return {};
+  }
+  const current = Array.isArray(infoPlist.CFBundleLocalizations)
+    ? infoPlist.CFBundleLocalizations.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  const region = infoPlist.CFBundleDevelopmentRegion;
+  const developmentLanguage =
+    typeof region === 'string' && !region.includes('$(') ? region : 'en';
+  return {
+    CFBundleLocalizations: [
+      ...new Set([developmentLanguage, ...current, ...existingLocalizations, ...languages]),
     ],
   };
 }

@@ -108,3 +108,43 @@ describe(findSharedUrlSchemes, () => {
     ).toEqual(['oauth']);
   });
 });
+
+describe('CFBundleLocalizations', () => {
+  const localized: NormalizedNativeVariantsOptions = {
+    ...options,
+    variants: [{...development, localizedDisplayNames: {ar: 'تطبيق', 'pt-BR': 'App'}}],
+  };
+
+  it('lists the development language, existing locales and every variant language once', () => {
+    const result = updateInfoPlist({
+      infoPlist: {CFBundleDevelopmentRegion: 'en', CFBundleLocalizations: ['de']},
+      options: localized,
+      expoSchemes: [],
+      existingLocalizations: ['fr', 'ar'],
+    });
+
+    expect(result.CFBundleLocalizations).toEqual(['en', 'de', 'fr', 'ar', 'pt-BR']);
+  });
+
+  it('falls back to en when the development region is a build setting', () => {
+    const result = updateInfoPlist({
+      infoPlist: {CFBundleDevelopmentRegion: '$(DEVELOPMENT_LANGUAGE)'},
+      options: localized,
+      expoSchemes: [],
+    });
+
+    expect(result.CFBundleLocalizations).toEqual(['en', 'ar', 'pt-BR']);
+  });
+
+  it('does not add CFBundleLocalizations when no variant is localized', () => {
+    const result = updateInfoPlist({infoPlist: {}, options, expoSchemes: []});
+
+    expect(result).not.toHaveProperty('CFBundleLocalizations');
+  });
+
+  it('keeps the display name build setting as the default fallback', () => {
+    const result = updateInfoPlist({infoPlist: {}, options: localized, expoSchemes: []});
+
+    expect(result.CFBundleDisplayName).toBe(`$(${DISPLAY_NAME_BUILD_SETTING})`);
+  });
+});

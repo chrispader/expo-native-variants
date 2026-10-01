@@ -41,7 +41,11 @@ export type NativeVariantsIosOptions = Readonly<{
 export type NativeVariantOptions = Readonly<{
   applicationId: string;
   icon?: string;
-  displayName?: string;
+  /**
+   * Home-screen name. A map gives per-language names keyed by BCP 47 tag and must
+   * include a `default` key, used when no language matches.
+   */
+  displayName?: string | Readonly<Record<string, string>>;
   urlScheme?: string;
   /** Native Expo Updates channel. Omit to inherit the shared or EAS configuration. */
   updateChannel?: string;
@@ -66,7 +70,10 @@ export type NativeVariantsOptions = Readonly<{
 
 export type NormalizedNativeVariant = Readonly<{
   key: string;
+  /** The default name, used when no localized name matches. */
   displayName: string;
+  /** Names by canonical BCP 47 tag, excluding the default. Absent when there are none. */
+  localizedDisplayNames?: Readonly<Record<string, string>>;
   iosBundleIdentifier: string;
   androidApplicationId: string;
   urlScheme: string;

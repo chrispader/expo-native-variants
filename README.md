@@ -66,7 +66,7 @@ The first declared variant supplies the Expo application identifiers, URL scheme
 | --- | --- |
 | `applicationId` | Full identifier shared by iOS and Android |
 | `icon` | Optional image shared by iOS and Android for this variant |
-| `displayName` | Optional name shown under the app icon; defaults to the Expo app name for the first variant and adds the variant name for the others |
+| `displayName` | Optional name shown under the app icon, or a map of names by language (see [Localized display names](#localized-display-names)); defaults to the Expo app name for the first variant and adds the variant name for the others |
 | `urlScheme` | Optional custom URL scheme; defaults to `applicationId` |
 | `updateChannel` | Optional native Expo Updates channel; omitted variants inherit the shared or EAS channel |
 | `runMode` | Xcode Run action's mode, `debug` by default |
@@ -79,6 +79,31 @@ The first declared variant supplies the Expo application identifiers, URL scheme
 | `android.flavor` | Optional Android product flavor name, starting with a lowercase letter |
 | `android.icon` | Optional Android launcher image |
 | `android.adaptiveIcon` | Optional `foregroundImage`, `backgroundImage`, `backgroundColor`, and `monochromeImage` |
+
+### Localized display names
+
+Give a variant per-language home-screen names with a map. It must contain a `default` key, which is used when no language matches. Other keys are BCP 47 tags such as `ar`, `pt-BR`, `zh-Hans`, or `zh-Hant`. A plain string works as before.
+
+```ts
+development: {
+  applicationId: 'com.acme.app.dev',
+  displayName: {
+    default: 'App Dev',
+    ar: 'تطبيق (تجريبي)',
+    fr: 'App Dév',
+  },
+},
+```
+
+Tags are canonicalized (`pt-br` becomes `pt-BR`), and two keys that canonicalize to the same tag are rejected. Names must not contain control characters. `displayName` stays the default name everywhere else in the plugin.
+
+On Android the plugin writes `values-b+<tag>/native_variants.xml` into the variant's flavor, containing only `app_name`. On iOS it writes `ios/<project>/NativeVariants/<variant>/<tag>.lproj/InfoPlist.strings` and adds an `[expo-native-variants] Localize display names` Run Script phase to the app target. At build time the phase copies the selected variant's strings into the built app, so each configuration shows its own names. The phase declares its inputs and outputs and works with user script sandboxing. The plugin also sets `CFBundleLocalizations` to the development language, your Expo `locales`, and every variant language. Do not edit the generated files or the phase; the plugin refuses to overwrite them if you do.
+
+#### Expo `locales` collision
+
+Expo's own [`locales`](https://docs.expo.dev/guides/localization/) option writes one shared resource per language. If a locale file sets `CFBundleDisplayName` (iOS) or `app_name` (Android), that shared name applies to every variant in that language, so a development build can show the production name. A build from the example app confirmed this on both platforms. The plugin overrides it where a variant lists the language: Android flavor resources win over the shared ones, and the iOS phase replaces only `CFBundleDisplayName` and keeps other localized keys such as permission texts. For a language that a variant does not list, the shared name still wins.
+
+The plugin warns during prebuild when a locale file sets the app name for a language that at least one variant does not list. In an Android build with `fr` in the development map only, the development APK showed the variant's French name and the production APK showed the shared one. Either remove the name key from the locale file, or list that language in every variant's `displayName` map.
 
 ### Icons
 
