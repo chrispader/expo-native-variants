@@ -55,9 +55,10 @@ export type NativeVariantMap = Readonly<Record<string, NativeVariantOptions>>;
 export type NativeVariantsOptions = Readonly<{
   /**
    * App identity used when evaluating Expo config, for example during EAS signing
-   * setup. Defaults to NATIVE_VARIANT, then the first declared variant. This does
-   * not filter the generated native builds. Native compilation uses its actual
-   * Xcode configuration or Android flavor for embedded metadata.
+   * setup. Defaults to NATIVE_VARIANT, then development if declared, then the
+   * first declared variant. This does not filter the generated native builds.
+   * Native compilation uses its actual Xcode configuration or Android flavor for
+   * embedded metadata.
    */
   variant?: string | undefined;
   ios?: NativeVariantsIosOptions;

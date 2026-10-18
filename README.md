@@ -58,7 +58,7 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 
 ## Options
 
-The first declared variant supplies the Expo application identifiers, URL scheme, and ordinary iOS `Debug` and `Release` configurations. Set `NATIVE_VARIANT` when a tool needs the config for a different app. The plugin fills `ios.bundleIdentifier`, `android.package`, and `scheme`; no wrapper or `getUrlScheme` function is needed. It preserves additional, non-variant schemes after the preferred scheme.
+Expo config evaluation uses the `development` variant when declared, otherwise the first declared variant. Set `NATIVE_VARIANT` when a tool needs the config for a different app. The plugin fills `ios.bundleIdentifier`, `android.package`, and `scheme`; no wrapper or `getUrlScheme` function is needed. It preserves additional, non-variant schemes after the preferred scheme. The selected variant also supplies the ordinary iOS `Debug` and `Release` configurations.
 
 `variants` is the only required plugin option. The optional `variant` property overrides `NATIVE_VARIANT` during Expo config evaluation, and `ios.targets` adds extension targets created by another plugin. Neither `variant` nor the environment variable limits the generated matrix: every variant is generated.
 
@@ -251,11 +251,13 @@ Native builds automatically supply their identity when generating the embedded E
 
 The plugin also embeds every variant's iOS bundle identifier and Android package name for development-server discovery. With a version of `expo-dev-launcher` that supports `EXDevLauncherDevServerApplicationIds`, each variant can discover the same Metro server while identifier matching stays enabled. Rebuild your development clients after adding or removing variants. Older launcher versions keep exact matching.
 
-A Metro server still serves one shared Expo manifest. Set `NATIVE_VARIANT` when you need that manifest to contain a particular variant's values; discovery does not select them. Keep the explicit `--scheme` when opening a specific app: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
+A Metro server serves one shared Expo manifest. With a `development` variant declared, start it without `NATIVE_VARIANT` to advertise that app's identifiers. Discovery does not select variant-specific manifest values. Keep the explicit `--scheme`: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
 
 ```sh
-NATIVE_VARIANT=development expo start --dev-client --scheme com.example.app.dev
+expo start --dev-client --scheme com.example.app.dev
 ```
+
+To develop another variant, set `NATIVE_VARIANT` to its key and pass its URL scheme. An explicit `variant` plugin option takes precedence over both the environment variable and the default.
 
 The Android development launcher also registers its own fixed `expo-dev-launcher` authentication scheme. That upstream callback remains shared when several debug clients are installed. The plugin preserves it and emits a warning. Use each variant's configured URL scheme for application links and development-client launch URLs.
 
@@ -279,7 +281,7 @@ Then choose `eas build --profile preview`. The plugin reads `NATIVE_VARIANT` aut
 
 Why not infer this from the EAS profile name? Expo's built-in `EAS_BUILD_PROFILE` is [not available during local app-config evaluation](https://docs.expo.dev/eas/environment-variables/usage/#using-environment-variables-with-eas-build). Profile `env` values are available both locally and on the builder. Using only the cloud profile name could select different identifiers during signing setup and the actual build.
 
-The `variant` plugin option is an escape hatch for config evaluation, not a build-matrix selector. For example, `variant: process.env.APP_VARIANT` lets an existing project keep its own environment-variable name. Without an override or `NATIVE_VARIANT`, config evaluation uses the first declared variant. During native compilation, the actual build identity takes precedence so its embedded metadata cannot accidentally use the config-evaluation default.
+The `variant` plugin option is an escape hatch for config evaluation, not a build-matrix selector. For example, `variant: process.env.APP_VARIANT` lets an existing project keep its own environment-variable name. Without an override or `NATIVE_VARIANT`, config evaluation uses `development` if declared, otherwise the first declared variant. During native compilation, the actual build identity takes precedence so its embedded metadata cannot accidentally use the config-evaluation default.
 
 The [example profiles](./example/eas.json) select Android Gradle tasks and ordinary iOS Debug/Release configurations. Treat them as a starting point. Cloud builds, signing, provisioning, and credential selection have not been verified, so EAS support is experimental. Do not rely on the cloud-only `EAS_BUILD_PROFILE` variable for local credential preflight.
 
