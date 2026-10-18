@@ -2,6 +2,7 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';
+import {withDevServerDiscovery} from './devClient';
 import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIdentifiers';
 import {normalizeNativeVariants} from './options';
 import {selectBuildVariant} from './options/selectBuildVariant';
@@ -61,6 +62,6 @@ function composeNativeVariantMods(
   options: NormalizedNativeVariantsOptions,
   updates: NativeUpdateChannels,
 ): ReturnType<ConfigPlugin> {
-  const withIos = withIosVariants(config, options, updates);
+  const withIos = withIosVariants(withDevServerDiscovery(config, options), options, updates);
   return withAndroidVariants(withIos, options, updates);
 }

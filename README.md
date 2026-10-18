@@ -249,7 +249,9 @@ Keep this entry before `expo-native-variants` in the plugins array. Existing thi
 
 Native builds automatically supply their identity when generating the embedded Expo config: iOS uses the build configuration, and Android generates a separate `expo-constants` asset for each flavor. The embedded scheme therefore matches the built app even when prebuild used a different default.
 
-A Metro server still serves one shared Expo manifest. Start it with `NATIVE_VARIANT` for the app you are developing. Keep the explicit `--scheme` as well: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
+The plugin also embeds every variant's iOS bundle identifier and Android package name for development-server discovery. With a version of `expo-dev-launcher` that supports `EXDevLauncherDevServerApplicationIds`, each variant can discover the same Metro server while identifier matching stays enabled. Rebuild your development clients after adding or removing variants. Older launcher versions keep exact matching.
+
+A Metro server still serves one shared Expo manifest. Set `NATIVE_VARIANT` when you need that manifest to contain a particular variant's values; discovery does not select them. Keep the explicit `--scheme` when opening a specific app: Expo CLI's Android native-scheme discovery reads unexpanded manifest placeholders.
 
 ```sh
 NATIVE_VARIANT=development expo start --dev-client --scheme com.example.app.dev
