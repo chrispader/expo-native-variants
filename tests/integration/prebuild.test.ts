@@ -17,6 +17,8 @@ import {fileURLToPath} from 'node:url';
 
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {EXPO_CONFIG_COMMAND} from '../../src/android/expoConfig';
+import {DEV_SERVER_APPLICATION_IDS} from '../../src/devClient';
+import {configPlugins} from '../../src/configPlugins';
 
 import {
   APP_CONFIG,
@@ -239,7 +241,10 @@ async function assertInitialNativeProject(root: string): Promise<void> {
   expect(infoPlist).toContain('<key>NeighborMarker</key>');
   expect(infoPlist).toContain('$(EXPO_NATIVE_VARIANT_DISPLAY_NAME)');
   expect(infoPlist).toContain('$(EXPO_NATIVE_VARIANT_URL_SCHEME)');
-  expect(infoPlist).not.toContain('<string>com.acme.app</string>');
+  expect(infoPlist).toContain(`<key>${DEV_SERVER_APPLICATION_IDS}</key>`);
+  await assertDevServerApplicationIds(root, [
+    'com.acme.app.dev', 'com.acme.app.preview', 'com.acme.app',
+  ]);
   expect(infoPlist).not.toContain('<string>exp+acme-native-variants-integration</string>');
 
   const extensionEntitlements = await readFile(
@@ -273,6 +278,9 @@ async function assertEmbeddedExpoConfig(root: string): Promise<void> {
 }
 
 async function assertNoRepeatedOutput(root: string): Promise<void> {
+  await assertDevServerApplicationIds(root, [
+    'com.acme.app.dev', 'com.acme.app.preview', 'com.acme.app',
+  ]);
   const buildGradle = await readFile(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
   expect(count(buildGradle, 'expo-native-variants:begin android')).toBe(1);
   expect(count(buildGradle, 'expo-native-variants:begin react')).toBe(1);
@@ -285,6 +293,7 @@ async function assertNoRepeatedOutput(root: string): Promise<void> {
 }
 
 async function assertRenamedNativeProject(root: string): Promise<void> {
+  await assertDevServerApplicationIds(root, ['com.acme.app.local', 'com.acme.app']);
   const buildGradle = await readFile(path.join(root, 'android', 'app', 'build.gradle'), 'utf8');
   expect(buildGradle).toContain('local {');
   expect(buildGradle).toContain('production {');
@@ -312,6 +321,22 @@ async function assertRenamedNativeProject(root: string): Promise<void> {
 
   const infoPlist = await readFile(await findFile(path.join(root, 'ios'), 'Info.plist'), 'utf8');
   expect(infoPlist).toContain('<key>NeighborMarker</key>');
+}
+
+async function assertDevServerApplicationIds(root: string, identifiers: readonly string[]): Promise<void> {
+  const infoPlist = await readFile(await findFile(path.join(root, 'ios'), 'Info.plist'), 'utf8');
+  const array = infoPlist.match(
+    new RegExp(`<key>${DEV_SERVER_APPLICATION_IDS}</key>\\s*<array>([\\s\\S]*?)</array>`),
+  );
+  expect([...(array?.[1] ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((match) => match[1]))
+    .toEqual(identifiers);
+  const manifest = await configPlugins.AndroidConfig.Manifest.readAndroidManifestAsync(
+    path.join(root, 'android/app/src/main/AndroidManifest.xml'),
+  );
+  const metadata = configPlugins.AndroidConfig.Manifest.getMainApplicationOrThrow(manifest)['meta-data'];
+  const entries = metadata?.filter(({$}) => $['android:name'] === DEV_SERVER_APPLICATION_IDS);
+  expect(entries).toHaveLength(1);
+  expect(JSON.parse(entries?.[0]?.$['android:value'] ?? 'null')).toEqual(identifiers);
 }
 
 async function expectResource(root: string, flavor: string, displayName: string): Promise<void> {
