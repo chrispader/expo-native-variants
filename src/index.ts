@@ -10,13 +10,16 @@ import type {NativeVariantsOptions, NormalizedNativeVariantsOptions} from './opt
 import {applySelectedVariantUpdateChannel, getNativeUpdateChannels} from './updates';
 import type {NativeUpdateChannels} from './updates';
 
-export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, options) => {
+/** CI systems often define NATIVE_VARIANT with no value; treat that as unset. */
+const envVariant = (value: string | undefined) => value?.trim() || undefined;
+
+export const withNativeVariants:ConfigPlugin<NativeVariantsOptions> = (config, options) => {
   const normalizedOptions = resolveVariantIcons(
     config,
     selectBuildVariant(
       normalizeNativeVariants({
         configName: config.name,
-        options: {...options, variant: options?.variant ?? process.env.NATIVE_VARIANT},
+        options: {...options, variant: options?.variant ?? envVariant(process.env.NATIVE_VARIANT)},
       }),
       process.env,
     ),
