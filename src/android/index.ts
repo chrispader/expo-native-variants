@@ -2,6 +2,11 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {configPlugins} from '../configPlugins';
 import {syncAndroidIcons} from '../icons/android';
+import {
+    ANDROID_NAME_KEY,
+    describeLocaleNameCollision,
+    findLocaleNameCollisions,
+} from '../localesCollision';
 import type {NormalizedNativeVariantsOptions} from '../options';
 import {reconcileAppBuildGradle} from './gradle';
 import {reconcileAndroidManifest} from './manifest';
@@ -68,6 +73,18 @@ export const withAndroidVariants = (
                 modConfig.modRequest.platformProjectRoot,
                 options,
             );
+            const collisions = await findLocaleNameCollisions({
+                locales: config.locales,
+                nameKey: ANDROID_NAME_KEY,
+                options,
+                projectRoot: modConfig.modRequest.projectRoot,
+            });
+            if (collisions.length > 0) {
+                WarningAggregator.addWarningAndroid(
+                    'expo-native-variants',
+                    describeLocaleNameCollision(collisions, ANDROID_NAME_KEY),
+                );
+            }
             await syncAndroidUpdateChannelManifests(
                 modConfig.modRequest.platformProjectRoot,
                 options,
