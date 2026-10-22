@@ -33,5 +33,11 @@ ${variants}
                 applicationVariant.mergeAssetsProvider.configure { dependsOn(configTask) }
             }
         }
+        // Lint also reads the flavor's asset directories, and lintVital runs on every release build.
+        tasks.configureEach { task ->
+            if (task.name.toLowerCase().contains("lint") && task.name.contains(flavor.capitalize())) {
+                task.dependsOn(configTask)
+            }
+        }
     }`;
 }

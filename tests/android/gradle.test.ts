@@ -85,6 +85,16 @@ describe('reconcileAppBuildGradle', () => {
         expect(result).toContain('applicationId "com.helloworld"');
     });
 
+    it('makes lint tasks depend on the generated Expo config', () => {
+        const result = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
+
+        expect(result).toContain('applicationVariant.mergeAssetsProvider.configure { dependsOn(configTask) }');
+        expect(result).toContain(
+            'if (task.name.toLowerCase().contains("lint") && task.name.contains(flavor.capitalize())) {',
+        );
+        expect(result).toContain('task.dependsOn(configTask)');
+    });
+
     it('is stable when applied repeatedly', () => {
         const first = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
         const second = reconcileAppBuildGradle(first, OPTIONS);
