@@ -69,6 +69,16 @@ describe('reconcileAndroidVariantResources', () => {
         );
     });
 
+    it('escapes app names for the Android resource compiler', async () => {
+        const root = await createAndroidProjectRoot();
+        const development = {...OPTIONS.variants[0]!, displayName: `Chris's "App" & <Dev>`};
+        await reconcileAndroidVariantResources(root, {...OPTIONS, variants: [development]});
+
+        await expect(readFile(resourceFile(root, 'development'), 'utf8')).resolves.toContain(
+            `<string name="app_name">Chris\\'s \\"App\\" &amp; &lt;Dev&gt;</string>`,
+        );
+    });
+
     it('is stable when applied repeatedly', async () => {
         const root = await createAndroidProjectRoot();
         await reconcileAndroidVariantResources(root, OPTIONS);
