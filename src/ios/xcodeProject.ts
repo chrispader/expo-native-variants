@@ -249,7 +249,7 @@ function reconcileConfigurationList({
   }
 
   for (const variant of options.variants) {
-    reconcileVariantConfiguration({
+    const debugConfiguration = reconcileVariantConfiguration({
       configurationList,
       configurationSection,
       fileReferences,
@@ -259,6 +259,9 @@ function reconcileConfigurationList({
       variant,
       owner,
     });
+    if (owner.type === 'project') {
+      addSwiftDebugCondition(debugConfiguration.buildSettings);
+    }
     reconcileVariantConfiguration({
       configurationList,
       configurationSection,
@@ -297,7 +300,7 @@ function reconcileVariantConfiguration({
   name,
   variant,
   owner,
-}: ReconcileVariantConfigurationArgs): void {
+}: ReconcileVariantConfigurationArgs): BuildConfiguration {
   const existing = findConfigurationByName({
     configurationList,
     configurationSection,
@@ -318,7 +321,7 @@ function reconcileVariantConfiguration({
     }
     existing.name = name;
     setManagedSettings(existing, variant, owner);
-    return;
+    return existing;
   }
 
   const uuid = generateUuid();
@@ -328,6 +331,7 @@ function reconcileVariantConfiguration({
   configurationSection[uuid] = configuration;
   configurationSection[`${uuid}_comment`] = name;
   configurationList.buildConfigurations.push({value: uuid, comment: name});
+  return configuration;
 }
 
 function adoptExtensionConfiguration({
@@ -403,6 +407,22 @@ function hasCocoaPodsBaseConfiguration({
   return [directComment, sectionComment, filePath].some(
     (value) => typeof value === 'string' && /Pods-.*\.xcconfig/i.test(value),
   );
+}
+
+/** React Native's post-install hook adds Swift's DEBUG condition only to the configuration named Debug. */
+function addSwiftDebugCondition(settings: Record<string, unknown>): void {
+  const current = settings.SWIFT_ACTIVE_COMPILATION_CONDITIONS;
+  const conditions = Array.isArray(current)
+    ? current
+    : typeof current === 'string'
+      ? [current]
+      : ['"$(inherited)"'];
+  const hasDebug = conditions.some(
+    (condition) => typeof condition === 'string' && unquote(condition).split(/\s+/).includes('DEBUG'),
+  );
+  if (!hasDebug) {
+    settings.SWIFT_ACTIVE_COMPILATION_CONDITIONS = [...conditions, 'DEBUG'];
+  }
 }
 
 function setManagedSettings(

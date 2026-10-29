@@ -6,6 +6,7 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 import {configPlugins} from '../configPlugins';
 import {syncIosIcons} from '../icons/ios';
 import type {NormalizedNativeVariantsOptions} from '../options';
+import {patchDevLauncherStripPhase} from './devLauncher';
 import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
 import {updatePodfile} from './podfile';
 import {syncSchemeFilesMod} from './schemeFiles';
@@ -116,6 +117,7 @@ export const withIosVariants = (
       )}`,
       enabled: updates.enabled,
     });
+    patchDevLauncherStripPhase(project);
     await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;
   }]);
