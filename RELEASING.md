@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are driven by conventional commits on `main`. Release Please keeps a release pull request up to date with the next version and changelog; merging that pull request creates the `v<version>` tag and GitHub release, validates the package, and publishes it to npm through trusted publishing.
+Releases are driven by [conventional commits](./CONTRIBUTING.md) on `main`. Release Please keeps a release pull request up to date with the next version and changelog; merging that pull request creates the `v<version>` tag and GitHub release, validates the package, and publishes it to npm through trusted publishing.
 
 `fix:` commits request a patch release, `feat:` commits request a minor release, and commits with a breaking-change marker request a major release. Other commit types do not normally request a release.
 

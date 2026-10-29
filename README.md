@@ -7,6 +7,7 @@ Stable releases use the npm `latest` tag, while prereleases use `next`.
 This community-maintained package targets Expo SDK 57 and 58. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 
 See the [validation record](./VALIDATION.md) for tested toolchain versions and results.
+Contributors should follow the [pull request and commit conventions](./CONTRIBUTING.md).
 Release maintainers can find the automated process in [RELEASING.md](./RELEASING.md).
 
 ## Configure variants
