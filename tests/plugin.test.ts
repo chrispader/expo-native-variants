@@ -69,6 +69,41 @@ describe('withNativeVariants', () => {
     expect(config.ios?.bundleIdentifier).toBe(bundleIdentifier);
   });
 
+  it('uses the selected variant for extension identifiers recorded for EAS', () => {
+    const entitlements = {
+      'com.apple.security.application-groups': ['group.$(EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER)'],
+    };
+    const extension = (targetName: string, bundleIdentifier: string) => ({
+      targetName,
+      bundleIdentifier,
+      entitlements,
+    });
+    const config = withNativeVariants(
+      {
+        name: 'Acme',
+        slug: 'acme',
+        extra: {
+          eas: {
+            projectId: 'kept',
+            build: {experimental: {ios: {appExtensions: [
+              extension('AcmeShare', 'com.example.acme.share'),
+              extension('Unmanaged', 'com.example.other'),
+            ]}}},
+          },
+        },
+      },
+      {ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.share'}}}, variants},
+    );
+
+    expect(config.extra?.eas).toEqual({
+      projectId: 'kept',
+      build: {experimental: {ios: {appExtensions: [
+        extension('AcmeShare', 'com.acme.app.dev.share'),
+        extension('Unmanaged', 'com.example.other'),
+      ]}}},
+    });
+  });
+
   it('projects an explicit variant over existing identifiers', () => {
     const config = withNativeVariants(
       {
