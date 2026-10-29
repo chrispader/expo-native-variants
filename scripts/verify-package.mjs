@@ -173,7 +173,7 @@ function verifyPackageMetadata(packageJson) {
   assertEqual(packageJson.types, 'dist/index.d.ts', 'package types');
   assertEqual(
     packageJson.peerDependencies?.expo,
-    '>=57.0.0 <58.0.0',
+    '>=57.0.0 <59.0.0',
     'bounded Expo peer dependency',
   );
   assertEqual(
@@ -343,7 +343,7 @@ if (getNativeVariant('com.acme.app', {production: {applicationId: 'com.acme.app'
 const CONSUMER_PACKAGE = {
   dependencies: {
     expo: '57.0.24',
-    'expo-native-variants': '0.3.0', // x-release-please-version
+    'expo-native-variants': '0.4.0', // x-release-please-version
     react: '19.2.3',
     'react-native': '0.86.3',
   },

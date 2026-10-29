@@ -7,9 +7,10 @@ import {createUpdateChannelsGradle} from './updates';
 const PLUGIN_NAME = 'expo-native-variants';
 const REACT_BLOCK_NAME = 'react';
 const ANDROID_BLOCK_NAME = 'android';
+const VARIANTS_BLOCK_NAME = 'variants';
 const EXPO_GENERATED_DEBUG_BUILD_TYPES = ['debug', 'debugOptimized'] as const;
 
-type ManagedBlockName = 'react' | 'android';
+type ManagedBlockName = 'react' | 'android' | 'variants';
 
 interface ManagedBlock {
     readonly content: string;
@@ -26,7 +27,8 @@ export function reconcileAppBuildGradle(
     options: NormalizedNativeVariantsOptions,
     updatesEnabled = false,
 ): string {
-    const withoutAndroidBlock = removeManagedBlock(source, ANDROID_BLOCK_NAME);
+    const withoutVariantsBlock = removeManagedBlock(source, VARIANTS_BLOCK_NAME).source;
+    const withoutAndroidBlock = removeManagedBlock(withoutVariantsBlock, ANDROID_BLOCK_NAME);
     const androidBlock = findNamedBlock(withoutAndroidBlock.source, ANDROID_BLOCK_NAME);
     assertNoForeignFlavors(
         withoutAndroidBlock.source.slice(androidBlock.bodyStart, androidBlock.bodyEnd),
@@ -54,8 +56,19 @@ export function reconcileAppBuildGradle(
         encodeMetadata(existingDebuggableVariants),
     );
     const androidContent = createAndroidContent(options, updatesEnabled);
+    const withAndroidContent = insertManagedContent(
+        withReactContent,
+        ANDROID_BLOCK_NAME,
+        androidContent,
+        '',
+    );
+    const variantsBlock = formatManagedBlock(
+        VARIANTS_BLOCK_NAME,
+        createExpoConfigGradle(options),
+        '',
+    );
 
-    return insertManagedContent(withReactContent, ANDROID_BLOCK_NAME, androidContent, '');
+    return `${withAndroidContent.trimEnd()}\n\n${variantsBlock}\n`;
 }
 
 function createReactContent(
@@ -130,9 +143,7 @@ function createAndroidContent(
     return `    flavorDimensions += ${quoteGroovy('nativeVariant')}
     productFlavors {
 ${flavors}
-    }
-
-${createExpoConfigGradle(options)}${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
+    }${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
 }
 
 function quoteGroovy(value: string): string {
@@ -364,11 +375,15 @@ function findClosingBrace(source: string, openingBrace: number): number {
 }
 
 function beginMarker(blockName: ManagedBlockName): string {
-    return `    // ${PLUGIN_NAME}:begin ${blockName}`;
+    return `${markerIndent(blockName)}// ${PLUGIN_NAME}:begin ${blockName}`;
 }
 
 function endMarker(blockName: ManagedBlockName): string {
-    return `    // ${PLUGIN_NAME}:end ${blockName}`;
+    return `${markerIndent(blockName)}// ${PLUGIN_NAME}:end ${blockName}`;
+}
+
+function markerIndent(blockName: ManagedBlockName): string {
+    return blockName === VARIANTS_BLOCK_NAME ? '' : '    ';
 }
 
 function hashContent(content: string): string {

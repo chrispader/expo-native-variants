@@ -6,8 +6,10 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 import {configPlugins} from '../configPlugins';
 import {syncIosIcons} from '../icons/ios';
 import type {NormalizedNativeVariantsOptions} from '../options';
+import {patchDevLauncherStripPhase} from './devLauncher';
 import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
 import {updatePodfile} from './podfile';
+import {PREBUILD_VARIANT_PROPERTY} from './prebuildVariant';
 import {syncSchemeFilesMod} from './schemeFiles';
 import {getXcodeProjectMetadata, updateXcodeProject} from './xcodeProject';
 import {reconcileIosUpdateChannelPhase} from './updates';
@@ -22,6 +24,7 @@ const {
   withInfoPlist,
   withExpoPlist,
   withPodfile,
+  withPodfileProperties,
 } = configPlugins;
 
 export const withIosVariants = (
@@ -57,6 +60,11 @@ export const withIosVariants = (
       projectName: requireProjectName(modConfig.modRequest.projectName),
       options,
     });
+    return modConfig;
+  });
+
+  config = withPodfileProperties(config, (modConfig) => {
+    modConfig.modResults[PREBUILD_VARIANT_PROPERTY] = options.selectedVariant.key;
     return modConfig;
   });
 
@@ -116,6 +124,7 @@ export const withIosVariants = (
       )}`,
       enabled: updates.enabled,
     });
+    patchDevLauncherStripPhase(project);
     await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;
   }]);
