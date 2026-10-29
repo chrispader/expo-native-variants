@@ -85,6 +85,23 @@ describe('reconcileAppBuildGradle', () => {
         expect(result).toContain('applicationId "com.helloworld"');
     });
 
+    it('registers the embedded Expo config through the variant API outside the android block', () => {
+        const result = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
+        const variantsBlock = result.slice(result.indexOf('// expo-native-variants:begin variants'));
+
+        expect(result.endsWith('// expo-native-variants:end variants\n')).toBe(true);
+        expect(result.indexOf('// expo-native-variants:begin variants')).toBeGreaterThan(
+            result.indexOf('    // expo-native-variants:end android'),
+        );
+        expect(variantsBlock).toContain('"development": "development"');
+        expect(variantsBlock).toContain('abstract class NativeVariantConfigTask extends Exec');
+        expect(variantsBlock).toContain(
+            'variant.sources.assets?.addGeneratedSourceDirectory(configTask) { it.assetsDirectory }',
+        );
+        expect(result).not.toContain('applicationVariants');
+        expect(result).not.toContain('assets.srcDir');
+    });
+
     it('is stable when applied repeatedly', () => {
         const first = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
         const second = reconcileAppBuildGradle(first, OPTIONS);

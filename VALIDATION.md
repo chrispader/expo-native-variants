@@ -81,7 +81,7 @@ Apple's asset compiler accepts all three example icon catalogs with each catalog
 
 ## Compatibility limits
 
-Expo `58.0.0-preview.3` passed an isolated clean prebuild advisory check. Its native compilation and runtime behavior remain untested. The package's supported peer range stays on SDK 57.
+Expo `58.0.0-preview.3` passed an isolated clean prebuild advisory check. Its native compilation and runtime behavior remain untested.
 
 The default Expo 57 template crashes before React Native starts when launched on iOS 27 after linking with the iOS 27 SDK. The crash identifies UIKit's scene-lifecycle assertion. The same release runs on iOS 26.5. Expo documents an [official scene-support opt-in](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md); this example does not enable or validate it.
 

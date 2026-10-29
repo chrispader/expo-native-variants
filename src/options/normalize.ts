@@ -67,7 +67,8 @@ export function normalizeNativeVariants({
     throw new Error('variants must contain at least one variant.');
   }
   const selectedVariantKey =
-    optionalNonemptyString(optionsRecord.variant, 'variant') ?? firstVariantKey;
+    optionalNonemptyString(optionsRecord.variant, 'variant') ??
+    (Object.hasOwn(variantsRecord, 'development') ? 'development' : firstVariantKey);
   validateVariantKey(selectedVariantKey, 'variant');
 
   const normalizedVariants = variantEntries.map(([key, variant], index) =>
