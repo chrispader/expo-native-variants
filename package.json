@@ -43,6 +43,7 @@
     "build": "tsup",
     "build:native:android": "node scripts/build-native.mjs android",
     "build:native:ios": "node scripts/build-native.mjs ios",
+    "example": "bun run --filter expo-native-variants-example",
     "test": "vitest run",
     "test:integration": "tsup && vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
