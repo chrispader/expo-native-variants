@@ -1,6 +1,8 @@
+import type {XcodeProject} from 'expo/config-plugins';
+
+import {configPlugins} from '../configPlugins';
 import type {
   NormalizedNativeVariant,
-  NormalizedNativeVariantsIosTarget,
   NormalizedNativeVariantsOptions,
 } from '../options';
 import {
@@ -11,29 +13,31 @@ import {
 import {applyIosIconBuildSettings} from '../icons/resolve';
 import {UPDATE_CHANNEL_BUILD_SETTING} from './updates';
 
+const {Target, XcodeUtils} = configPlugins.IOSConfig;
+
 const MANAGED_BUILD_SETTING = 'EXPO_NATIVE_VARIANTS_MANAGED';
 const APPLICATION_IDENTIFIER_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_BUNDLE_IDENTIFIER';
 const VARIANT_KEY_BUILD_SETTING = 'EXPO_NATIVE_VARIANT_KEY';
-const APPLICATION_PRODUCT_TYPE = 'com.apple.product-type.application';
-const SUPPORTED_EXTENSION_PRODUCT_TYPES = new Set([
-  'com.apple.product-type.app-extension',
+const SUPPORTED_EXTENSION_PRODUCT_TYPES = new Set<string>([
+  Target.TargetType.EXTENSION,
   'com.apple.product-type.extensionkit-extension',
 ]);
-
-type XcodeProjectLike = Readonly<{
-  generateUuid: () => string;
-  pbxFileReferenceSection: () => Record<string, unknown>;
-  pbxNativeTargetSection: () => Record<string, unknown>;
-  pbxProjectSection: () => Record<string, unknown>;
-  pbxXCBuildConfigurationSection: () => Record<string, unknown>;
-  pbxXCConfigurationList: () => Record<string, unknown>;
-}>;
 
 export type XcodeProjectMetadata = Readonly<{
   targetUuid: string;
   targetName: string;
   productName: string;
 }>;
+
+// Expo's helpers return untyped xcode objects, so these describe the fields the plugin reads.
+type NativeTarget = {
+  buildConfigurationList: string;
+  name: string;
+  productName: string;
+  productType: string;
+};
+
+type NativeTargetEntry = readonly [uuid: string, target: NativeTarget];
 
 type BuildConfiguration = {
   isa: string;
@@ -43,142 +47,90 @@ type BuildConfiguration = {
   name: string;
 };
 
-type ConfigurationReference = {value: string; comment: string};
-type ConfigurationList = {buildConfigurations: ConfigurationReference[]};
-type NativeTargetEntry = readonly [string, Record<string, unknown>];
+type ConfigurationList = {buildConfigurations: {value: string; comment: string}[]};
 type ConfigurationOwner =
   | Readonly<{type: 'project'}>
   | Readonly<{type: 'application'}>
   | Readonly<{bundleIdentifierSuffix: string; type: 'extension'}>;
 
 export function updateXcodeProject(
-  projectValue: unknown,
+  project: XcodeProject,
   options: NormalizedNativeVariantsOptions,
 ): XcodeProjectMetadata {
-  const project = requireXcodeProject(projectValue);
-  const metadata = readXcodeProjectMetadata(project);
-  const nativeTargets = readNativeTargetEntries(project.pbxNativeTargetSection());
-  const [, target] = requireApplicationTarget(nativeTargets);
-  const projectEntry = requireSingleEntry(project.pbxProjectSection(), 'PBX project');
-  const [, pbxProject] = projectEntry;
-  const targetConfigurationListId = requireString(
-    target.buildConfigurationList,
-    'native target configuration list',
-  );
-  const projectConfigurationListId = requireString(
-    pbxProject.buildConfigurationList,
-    'project configuration list',
-  );
-  const configurationSection = project.pbxXCBuildConfigurationSection();
-  const configurationLists = project.pbxXCConfigurationList();
-  const fileReferences = project.pbxFileReferenceSection();
+  const nativeTargets: readonly NativeTargetEntry[] = Target.getNativeTargets(project);
+  const applicationTarget = requireApplicationTarget(nativeTargets);
+  const [applicationTargetUuid, target] = applicationTarget;
+  const projectConfigurationListId: string =
+    project.getFirstProject().firstProject.buildConfigurationList;
 
   reconcileConfigurationList({
-    configurationList: requireConfigurationList(
-      configurationLists[targetConfigurationListId],
-      'native target',
-    ),
-    configurationSection,
-    fileReferences,
-    generateUuid: project.generateUuid.bind(project),
+    project,
+    configurationListId: target.buildConfigurationList,
     options,
     owner: {type: 'application'},
   });
   reconcileConfigurationList({
-    configurationList: requireConfigurationList(
-      configurationLists[projectConfigurationListId],
-      'project',
-    ),
-    configurationSection,
-    fileReferences,
-    generateUuid: project.generateUuid.bind(project),
+    project,
+    configurationListId: projectConfigurationListId,
     options,
     owner: {type: 'project'},
   });
 
   reconcileExtensionTargets({
-    configuredTargets: options.iosTargets,
-    configurationLists,
-    configurationSection,
-    fileReferences,
-    generateUuid: project.generateUuid.bind(project),
+    project,
     nativeTargets,
     options,
-    applicationTargetUuid: metadata.targetUuid,
+    applicationTargetUuid,
   });
 
-  return metadata;
+  return readXcodeProjectMetadata(applicationTarget);
 }
 
-export function getXcodeProjectMetadata(projectValue: unknown): XcodeProjectMetadata {
-  return readXcodeProjectMetadata(requireXcodeProject(projectValue));
+export function getXcodeProjectMetadata(project: XcodeProject): XcodeProjectMetadata {
+  return readXcodeProjectMetadata(requireApplicationTarget(Target.getNativeTargets(project)));
 }
 
-function readXcodeProjectMetadata(project: XcodeProjectLike): XcodeProjectMetadata {
-  const [targetUuid, target] = requireApplicationTarget(
-    readNativeTargetEntries(project.pbxNativeTargetSection()),
-  );
-
-  requireSingleEntry(project.pbxProjectSection(), 'PBX project');
-  const targetName = unquote(requireString(target.name, 'native target name'));
-  const productName = unquote(requireString(target.productName, 'native target product name'));
-  return {targetUuid, targetName, productName};
+function readXcodeProjectMetadata([targetUuid, target]: NativeTargetEntry): XcodeProjectMetadata {
+  return {
+    targetUuid,
+    targetName: XcodeUtils.unquote(target.name),
+    productName: XcodeUtils.unquote(target.productName),
+  };
 }
 
 type ReconcileExtensionTargetsArgs = Readonly<{
-  configuredTargets: readonly NormalizedNativeVariantsIosTarget[];
-  configurationLists: Record<string, unknown>;
-  configurationSection: Record<string, unknown>;
-  fileReferences: Record<string, unknown>;
-  generateUuid: () => string;
+  project: XcodeProject;
   nativeTargets: readonly NativeTargetEntry[];
   options: NormalizedNativeVariantsOptions;
   applicationTargetUuid: string;
 }>;
 
 function reconcileExtensionTargets({
-  configuredTargets,
-  configurationLists,
-  configurationSection,
-  fileReferences,
-  generateUuid,
+  project,
   nativeTargets,
   options,
   applicationTargetUuid,
 }: ReconcileExtensionTargetsArgs): void {
-  const configuredNames = new Set(configuredTargets.map(({name}) => name));
-  const targetByName = new Map(
-    nativeTargets.map((entry) => [readTargetName(entry[1]), entry]),
-  );
+  const configuredNames = new Set(options.iosTargets.map(({name}) => name));
 
-  for (const configuredTarget of configuredTargets) {
-    const entry = targetByName.get(configuredTarget.name);
-    if (entry === undefined) {
+  for (const configuredTarget of options.iosTargets) {
+    const target = nativeTargets.find(
+      ([, nativeTarget]) => XcodeUtils.unquote(nativeTarget.name) === configuredTarget.name,
+    )?.[1];
+    if (target === undefined) {
       throw new Error(
         `expo-native-variants could not find configured iOS extension target "${configuredTarget.name}". Ensure its target-generating plugin runs before expo-native-variants.`,
       );
     }
-    const [, target] = entry;
-    const productType = unquote(
-      requireString(target.productType, `target "${configuredTarget.name}" product type`),
-    );
+    const productType = XcodeUtils.unquote(target.productType);
     if (!SUPPORTED_EXTENSION_PRODUCT_TYPES.has(productType)) {
       throw new Error(
         `expo-native-variants supports app-extension targets in ios.targets; "${configuredTarget.name}" has product type "${productType}".`,
       );
     }
-    const configurationListId = requireString(
-      target.buildConfigurationList,
-      `target "${configuredTarget.name}" configuration list`,
-    );
     reconcileConfigurationList({
-      configurationList: requireConfigurationList(
-        configurationLists[configurationListId],
-        `target "${configuredTarget.name}"`,
-      ),
-      configurationSection,
-      fileReferences,
-      generateUuid,
+      project,
+      configurationListId: target.buildConfigurationList,
       options,
       owner: {
         bundleIdentifierSuffix: configuredTarget.bundleIdentifierSuffix,
@@ -189,8 +141,8 @@ function reconcileExtensionTargets({
 
   const unsupportedTargets = nativeTargets
     .filter(([uuid, target]) =>
-      uuid !== applicationTargetUuid && !configuredNames.has(readTargetName(target)))
-    .map(([, target]) => readTargetName(target));
+      uuid !== applicationTargetUuid && !configuredNames.has(XcodeUtils.unquote(target.name)))
+    .map(([, target]) => XcodeUtils.unquote(target.name));
   if (unsupportedTargets.length > 0) {
     throw new Error(
       `expo-native-variants found additional iOS targets that are not configured in ios.targets: ${unsupportedTargets.join(', ')}.`,
@@ -199,32 +151,20 @@ function reconcileExtensionTargets({
 }
 
 type ReconcileConfigurationListArgs = Readonly<{
-  configurationList: ConfigurationList;
-  configurationSection: Record<string, unknown>;
-  fileReferences: Record<string, unknown>;
-  generateUuid: () => string;
+  project: XcodeProject;
+  configurationListId: string;
   options: NormalizedNativeVariantsOptions;
   owner: ConfigurationOwner;
 }>;
 
 function reconcileConfigurationList({
-  configurationList,
-  configurationSection,
-  fileReferences,
-  generateUuid,
+  project,
+  configurationListId,
   options,
   owner,
 }: ReconcileConfigurationListArgs): void {
-  const debugSource = getConfigurationByName({
-    configurationList,
-    configurationSection,
-    name: 'Debug',
-  });
-  const releaseSource = getConfigurationByName({
-    configurationList,
-    configurationSection,
-    name: 'Release',
-  });
+  const debugSource = getConfigurationByName(project, configurationListId, 'Debug');
+  const releaseSource = getConfigurationByName(project, configurationListId, 'Release');
   const desiredNames = new Set(
     options.variants.flatMap((variant) => [
       variant.debugConfiguration,
@@ -232,28 +172,18 @@ function reconcileConfigurationList({
     ]),
   );
 
-  for (const reference of [...configurationList.buildConfigurations]) {
-    const configuration = requireBuildConfiguration(
-      configurationSection[reference.value],
-      reference.comment,
-    );
+  for (const [uuid, configuration] of getBuildConfigurations(project, configurationListId)) {
     const isManaged = configuration.buildSettings[MANAGED_BUILD_SETTING] === 'YES';
 
-    if (isManaged && !desiredNames.has(unquote(configuration.name))) {
-      removeBuildConfiguration({
-        configurationList,
-        configurationSection,
-        uuid: reference.value,
-      });
+    if (isManaged && !desiredNames.has(XcodeUtils.unquote(configuration.name))) {
+      removeBuildConfiguration(project, configurationListId, uuid);
     }
   }
 
   for (const variant of options.variants) {
     const debugConfiguration = reconcileVariantConfiguration({
-      configurationList,
-      configurationSection,
-      fileReferences,
-      generateUuid,
+      project,
+      configurationListId,
       source: debugSource,
       name: variant.debugConfiguration,
       variant,
@@ -263,10 +193,8 @@ function reconcileConfigurationList({
       addSwiftDebugCondition(debugConfiguration.buildSettings);
     }
     reconcileVariantConfiguration({
-      configurationList,
-      configurationSection,
-      fileReferences,
-      generateUuid,
+      project,
+      configurationListId,
       source: releaseSource,
       name: variant.releaseConfiguration,
       variant,
@@ -281,10 +209,8 @@ function reconcileConfigurationList({
 }
 
 type ReconcileVariantConfigurationArgs = Readonly<{
-  configurationList: ConfigurationList;
-  configurationSection: Record<string, unknown>;
-  fileReferences: Record<string, unknown>;
-  generateUuid: () => string;
+  project: XcodeProject;
+  configurationListId: string;
   source: BuildConfiguration;
   name: string;
   variant: NormalizedNativeVariant;
@@ -292,20 +218,15 @@ type ReconcileVariantConfigurationArgs = Readonly<{
 }>;
 
 function reconcileVariantConfiguration({
-  configurationList,
-  configurationSection,
-  fileReferences,
-  generateUuid,
+  project,
+  configurationListId,
   source,
   name,
   variant,
   owner,
 }: ReconcileVariantConfigurationArgs): BuildConfiguration {
-  const existing = findConfigurationByName({
-    configurationList,
-    configurationSection,
-    name,
-  });
+  const fileReferences: Record<string, unknown> = project.pbxFileReferenceSection();
+  const existing = findConfigurationByName(project, configurationListId, name);
 
   if (existing !== undefined) {
     const isManaged = existing.buildSettings[MANAGED_BUILD_SETTING] === 'YES';
@@ -324,13 +245,17 @@ function reconcileVariantConfiguration({
     return existing;
   }
 
-  const uuid = generateUuid();
+  const uuid = project.generateUuid();
   const configuration = cloneConfiguration({source, fileReferences});
   configuration.name = name;
   setManagedSettings(configuration, variant, owner);
+  const configurationSection = project.pbxXCBuildConfigurationSection();
   configurationSection[uuid] = configuration;
   configurationSection[`${uuid}_comment`] = name;
-  configurationList.buildConfigurations.push({value: uuid, comment: name});
+  getConfigurationList(project, configurationListId).buildConfigurations.push({
+    value: uuid,
+    comment: name,
+  });
   return configuration;
 }
 
@@ -418,7 +343,9 @@ function addSwiftDebugCondition(settings: Record<string, unknown>): void {
       ? [current]
       : ['"$(inherited)"'];
   const hasDebug = conditions.some(
-    (condition) => typeof condition === 'string' && unquote(condition).split(/\s+/).includes('DEBUG'),
+    (condition) =>
+      typeof condition === 'string' &&
+      XcodeUtils.unquote(condition).split(/\s+/).includes('DEBUG'),
   );
   if (!hasDebug) {
     settings.SWIFT_ACTIVE_COMPILATION_CONDITIONS = [...conditions, 'DEBUG'];
@@ -468,20 +395,12 @@ function applyVariantSettings(
   }
 }
 
-function getConfigurationByName({
-  configurationList,
-  configurationSection,
-  name,
-}: Readonly<{
-  configurationList: ConfigurationList;
-  configurationSection: Record<string, unknown>;
-  name: string;
-}>): BuildConfiguration {
-  const configuration = findConfigurationByName({
-    configurationList,
-    configurationSection,
-    name,
-  });
+function getConfigurationByName(
+  project: XcodeProject,
+  configurationListId: string,
+  name: string,
+): BuildConfiguration {
+  const configuration = findConfigurationByName(project, configurationListId, name);
   if (configuration === undefined) {
     throw new Error(
       `expo-native-variants requires the standard iOS build configuration "${name}".`,
@@ -490,171 +409,60 @@ function getConfigurationByName({
   return configuration;
 }
 
-function findConfigurationByName({
-  configurationList,
-  configurationSection,
-  name,
-}: Readonly<{
-  configurationList: ConfigurationList;
-  configurationSection: Record<string, unknown>;
-  name: string;
-}>): BuildConfiguration | undefined {
-  for (const reference of configurationList.buildConfigurations) {
-    const configuration = requireBuildConfiguration(
-      configurationSection[reference.value],
-      reference.comment,
-    );
-    if (unquote(configuration.name) === name) {
-      return configuration;
-    }
-  }
-  return undefined;
+function findConfigurationByName(
+  project: XcodeProject,
+  configurationListId: string,
+  name: string,
+): BuildConfiguration | undefined {
+  return getBuildConfigurations(project, configurationListId).find(
+    ([, configuration]) => XcodeUtils.unquote(configuration.name) === name,
+  )?.[1];
 }
 
-function removeBuildConfiguration({
-  configurationList,
-  configurationSection,
-  uuid,
-}: Readonly<{
-  configurationList: ConfigurationList;
-  configurationSection: Record<string, unknown>;
-  uuid: string;
-}>): void {
+function removeBuildConfiguration(
+  project: XcodeProject,
+  configurationListId: string,
+  uuid: string,
+): void {
+  const configurationList = getConfigurationList(project, configurationListId);
   configurationList.buildConfigurations = configurationList.buildConfigurations.filter(
     (reference) => reference.value !== uuid,
   );
+  const configurationSection = project.pbxXCBuildConfigurationSection();
   delete configurationSection[uuid];
   delete configurationSection[`${uuid}_comment`];
-}
-
-function requireXcodeProject(value: unknown): XcodeProjectLike {
-  if (!isRecord(value)) {
-    throw new Error('expo-native-variants received an invalid Xcode project.');
-  }
-
-  const methodNames = [
-    'generateUuid',
-    'pbxFileReferenceSection',
-    'pbxNativeTargetSection',
-    'pbxProjectSection',
-    'pbxXCBuildConfigurationSection',
-    'pbxXCConfigurationList',
-  ] as const;
-  if (!methodNames.every((name) => typeof value[name] === 'function')) {
-    throw new Error('expo-native-variants received an invalid Xcode project.');
-  }
-
-  return value as unknown as XcodeProjectLike;
-}
-
-function readNativeTargetEntries(
-  section: Record<string, unknown>,
-): readonly NativeTargetEntry[] {
-  return Object.entries(section).filter(
-    (entry): entry is [string, Record<string, unknown>] =>
-      !entry[0].endsWith('_comment') && isRecord(entry[1]),
-  );
 }
 
 function requireApplicationTarget(
   nativeTargets: readonly NativeTargetEntry[],
 ): NativeTargetEntry {
-  const applicationTargets = nativeTargets.filter(([, target]) => {
-    const productType = target.productType;
-    return typeof productType === 'string' && unquote(productType) === APPLICATION_PRODUCT_TYPE;
-  });
-  if (applicationTargets.length !== 1) {
+  const applicationTargets = nativeTargets.filter(([, target]) =>
+    Target.isTargetOfType(target, Target.TargetType.APPLICATION));
+  const [applicationTarget] = applicationTargets;
+  if (applicationTargets.length !== 1 || applicationTarget === undefined) {
     throw new Error(
       `expo-native-variants supports exactly one iOS application target; found ${applicationTargets.length}.`,
     );
   }
-
-  const applicationTarget = applicationTargets[0];
-  if (applicationTarget === undefined) {
-    throw new Error('expo-native-variants could not find an iOS application target.');
-  }
   return applicationTarget;
 }
 
-function readTargetName(target: Record<string, unknown>): string {
-  return unquote(requireString(target.name, 'native target name'));
+function getBuildConfigurations(
+  project: XcodeProject,
+  configurationListId: string,
+): readonly (readonly [uuid: string, configuration: BuildConfiguration])[] {
+  return XcodeUtils.getBuildConfigurationsForListId(project, configurationListId);
 }
 
-function requireSingleEntry(
-  section: Record<string, unknown>,
-  label: string,
-): readonly [string, Record<string, unknown>] {
-  const entries = Object.entries(section).filter(
-    ([key, value]) => !key.endsWith('_comment') && isRecord(value),
-  );
-  if (entries.length !== 1) {
-    throw new Error(
-      `expo-native-variants supports exactly one iOS ${label}; found ${entries.length}.`,
-    );
-  }
-
-  const entry = entries[0];
-  if (entry === undefined) {
-    throw new Error(`expo-native-variants could not find an iOS ${label}.`);
-  }
-  const [uuid, object] = entry;
-  if (!isRecord(object)) {
-    throw new Error(`expo-native-variants could not read the iOS ${label}.`);
-  }
-  return [uuid, object];
-}
-
-function requireConfigurationList(value: unknown, label: string): ConfigurationList {
-  if (!isRecord(value) || !Array.isArray(value.buildConfigurations)) {
-    throw new Error(
-      `expo-native-variants could not read the ${label} iOS configuration list.`,
-    );
-  }
-
-  const references = value.buildConfigurations.map((reference) => {
-    if (
-      !isRecord(reference) ||
-      typeof reference.value !== 'string' ||
-      typeof reference.comment !== 'string'
-    ) {
-      throw new Error(
-        `expo-native-variants found an invalid entry in the ${label} iOS configuration list.`,
-      );
-    }
-    return {value: reference.value, comment: reference.comment};
-  });
-
-  value.buildConfigurations = references;
-  return value as ConfigurationList;
-}
-
-function requireBuildConfiguration(value: unknown, label: string): BuildConfiguration {
-  if (
-    !isRecord(value) ||
-    value.isa !== 'XCBuildConfiguration' ||
-    !isRecord(value.buildSettings) ||
-    typeof value.name !== 'string'
-  ) {
-    throw new Error(
-      `expo-native-variants could not read iOS build configuration "${label}".`,
-    );
-  }
-  return value as BuildConfiguration;
-}
-
-function requireString(value: unknown, label: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(`expo-native-variants could not read the iOS ${label}.`);
-  }
-  return value;
+function getConfigurationList(
+  project: XcodeProject,
+  configurationListId: string,
+): ConfigurationList {
+  return project.pbxXCConfigurationList()[configurationListId];
 }
 
 function quote(value: string): string {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
-}
-
-function unquote(value: string): string {
-  return value.match(/^"(.*)"$/)?.[1] ?? value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

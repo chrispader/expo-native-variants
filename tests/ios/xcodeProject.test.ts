@@ -291,9 +291,9 @@ function createProjectFixture() {
   };
   const project = {
     generateUuid: () => `GENERATED_${String(++uuid)}`,
+    getFirstProject: () => ({uuid: 'PROJECT', firstProject: sections.projects.PROJECT}),
     pbxFileReferenceSection: () => sections.files,
     pbxNativeTargetSection: () => sections.nativeTargets,
-    pbxProjectSection: () => sections.projects,
     pbxXCBuildConfigurationSection: () => sections.configurations,
     pbxXCConfigurationList: () => sections.lists,
   };
