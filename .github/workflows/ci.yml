@@ -51,3 +51,5 @@ jobs:
 
       - name: Run compiled consumer integration
         run: bun run test:integration
+        env:
+          EXPO_NATIVE_VARIANTS_EXPO_58: '1'

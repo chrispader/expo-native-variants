@@ -4,7 +4,7 @@ Generate every native app variant in one Expo prebuild. Switch between developme
 
 Stable releases use the npm `latest` tag, while prereleases use `next`.
 
-This community-maintained package targets Expo SDK 57. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
+This community-maintained package targets Expo SDK 57 and 58. It is an early release for the standard Expo native templates with one iOS application target, optional explicitly configured iOS extension targets, and one Android flavor dimension. See [compatibility](#compatibility) before adding it to an existing app.
 
 See the [validation record](./VALIDATION.md) for tested toolchain versions and results.
 Release maintainers can find the automated process in [RELEASING.md](./RELEASING.md).
@@ -53,6 +53,8 @@ For Android, Expo CLI also accepts explicit variant and application selection:
 ```sh
 expo run:android --variant developmentDebug --app-id com.example.app.dev
 ```
+
+Expo CLI 58 treats every Android variant other than `debug` and `debugOptimized` as a production build, so this command loads the production `.env` files there. Build flavored debug variants from Android Studio and start Metro with `expo start --dev-client` when they depend on development `.env` values.
 
 On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinary `Debug` configuration unless one is specified, and its environment-mode handling checks for the literal name `Release`. Selecting a custom scheme alone does not reliably select its configured build mode.
 

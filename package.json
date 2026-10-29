@@ -55,7 +55,7 @@
     "node": ">=20.19.4"
   },
   "peerDependencies": {
-    "expo": ">=57.0.0 <58.0.0"
+    "expo": ">=57.0.0 <59.0.0"
   },
   "devDependencies": {
     "@bacons/apple-targets": "5.0.0",

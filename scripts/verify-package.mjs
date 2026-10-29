@@ -173,7 +173,7 @@ function verifyPackageMetadata(packageJson) {
   assertEqual(packageJson.types, 'dist/index.d.ts', 'package types');
   assertEqual(
     packageJson.peerDependencies?.expo,
-    '>=57.0.0 <58.0.0',
+    '>=57.0.0 <59.0.0',
     'bounded Expo peer dependency',
   );
   assertEqual(
