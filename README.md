@@ -305,6 +305,8 @@ The [example](./example) contains three variants and displays the installed iden
 
 Run the root package scripts with `npm run <script>`. Available scripts include `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
 
+The `example` script forwards a script name and any following arguments to the example workspace. Use `npm run example -- start`, `npm run example -- prebuild`, or `npm run example -- config` from the repository root.
+
 ## License
 
 [MIT](./LICENSE).

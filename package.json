@@ -1,6 +1,6 @@
 {
   "name": "expo-native-variants",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "packageManager": "bun@1.3.1",
   "description": "Generate multiple native Expo variants in one prebuild.",
   "author": "Christoph Pader",
@@ -43,6 +43,7 @@
     "build": "tsup",
     "build:native:android": "node scripts/build-native.mjs android",
     "build:native:ios": "node scripts/build-native.mjs ios",
+    "example": "bun run --filter expo-native-variants-example",
     "test": "vitest run",
     "test:integration": "tsup && vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
