@@ -70,6 +70,24 @@ android {
 `;
 
 describe('reconcileAppBuildGradle', () => {
+    it.each([
+        "def description = '''Chris's app'''",
+        'def description = """Chris says "hi" today"""',
+        "def pattern = /don't/",
+        "def pattern = $/don't/$",
+        'def ratio = count / 2',
+        `def description = "\${"don't"}"`,
+        `def description = "\${foo("don't")}"`,
+
+        "def pattern = /first\nandroid { fake }\nlast/",
+        "def pattern = $/first\nreact { fake }\nlast/$",
+    ])('keeps real Gradle blocks after valid Groovy expressions: %s', (prefix) => {
+        const result = reconcileAppBuildGradle(`${prefix}\n${EXPO_GRADLE}`, OPTIONS);
+        expect(result.startsWith(`${prefix}\n`)).toBe(true);
+        expect(result).toContain('applicationId("com.acme.app.dev")');
+        expect(reconcileAppBuildGradle(result, OPTIONS)).toBe(result);
+    });
+
     it('generates full application IDs and debug-only React variants', () => {
         const result = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
 
@@ -83,6 +101,23 @@ describe('reconcileAppBuildGradle', () => {
         expect(result).not.toContain('resValue');
         expect(result).toContain('namespace "com.helloworld"');
         expect(result).toContain('applicationId "com.helloworld"');
+    });
+
+    it('registers the embedded Expo config through the variant API outside the android block', () => {
+        const result = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
+        const variantsBlock = result.slice(result.indexOf('// expo-native-variants:begin variants'));
+
+        expect(result.endsWith('// expo-native-variants:end variants\n')).toBe(true);
+        expect(result.indexOf('// expo-native-variants:begin variants')).toBeGreaterThan(
+            result.indexOf('    // expo-native-variants:end android'),
+        );
+        expect(variantsBlock).toContain('"development": "development"');
+        expect(variantsBlock).toContain('abstract class NativeVariantConfigTask extends Exec');
+        expect(variantsBlock).toContain(
+            'variant.sources.assets?.addGeneratedSourceDirectory(configTask) { it.assetsDirectory }',
+        );
+        expect(result).not.toContain('applicationVariants');
+        expect(result).not.toContain('assets.srcDir');
     });
 
     it('is stable when applied repeatedly', () => {

@@ -4,23 +4,22 @@ import type {NormalizedNativeVariantsOptions} from './types';
 export function selectBuildVariant(
   options: NormalizedNativeVariantsOptions,
   environment: Readonly<Record<string, string | undefined>>,
+  prebuildVariant?: string,
 ): NormalizedNativeVariantsOptions {
-  const nativeKey = environment.EXPO_NATIVE_VARIANT_KEY;
   const configurationVariant = options.variants.find((variant) =>
     [variant.debugConfiguration, variant.releaseConfiguration].includes(
       environment.CONFIGURATION ?? '',
     ),
   );
-  if (nativeKey === undefined && configurationVariant === undefined) {
+  // Xcode builds of the plain Debug and Release configurations use the variant prebuild wrote into them.
+  const key = environment.EXPO_NATIVE_VARIANT_KEY ?? configurationVariant?.key ?? prebuildVariant;
+  if (key === undefined) {
     return options;
   }
-  const selectedVariant =
-    nativeKey === undefined
-      ? configurationVariant
-      : options.variants.find(({key}) => key === nativeKey);
+  const selectedVariant = options.variants.find((variant) => variant.key === key);
   if (selectedVariant === undefined) {
     throw new Error(
-      `Native build references unknown variant "${nativeKey}". Run prebuild again after changing variants.`,
+      `Native build references unknown variant "${key}". Run prebuild again after changing variants.`,
     );
   }
   return Object.freeze({...options, selectedVariant});

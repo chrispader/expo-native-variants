@@ -7,9 +7,10 @@ import {createUpdateChannelsGradle} from './updates';
 const PLUGIN_NAME = 'expo-native-variants';
 const REACT_BLOCK_NAME = 'react';
 const ANDROID_BLOCK_NAME = 'android';
+const VARIANTS_BLOCK_NAME = 'variants';
 const EXPO_GENERATED_DEBUG_BUILD_TYPES = ['debug', 'debugOptimized'] as const;
 
-type ManagedBlockName = 'react' | 'android';
+type ManagedBlockName = 'react' | 'android' | 'variants';
 
 interface ManagedBlock {
     readonly content: string;
@@ -26,7 +27,8 @@ export function reconcileAppBuildGradle(
     options: NormalizedNativeVariantsOptions,
     updatesEnabled = false,
 ): string {
-    const withoutAndroidBlock = removeManagedBlock(source, ANDROID_BLOCK_NAME);
+    const withoutVariantsBlock = removeManagedBlock(source, VARIANTS_BLOCK_NAME).source;
+    const withoutAndroidBlock = removeManagedBlock(withoutVariantsBlock, ANDROID_BLOCK_NAME);
     const androidBlock = findNamedBlock(withoutAndroidBlock.source, ANDROID_BLOCK_NAME);
     assertNoForeignFlavors(
         withoutAndroidBlock.source.slice(androidBlock.bodyStart, androidBlock.bodyEnd),
@@ -54,8 +56,19 @@ export function reconcileAppBuildGradle(
         encodeMetadata(existingDebuggableVariants),
     );
     const androidContent = createAndroidContent(options, updatesEnabled);
+    const withAndroidContent = insertManagedContent(
+        withReactContent,
+        ANDROID_BLOCK_NAME,
+        androidContent,
+        '',
+    );
+    const variantsBlock = formatManagedBlock(
+        VARIANTS_BLOCK_NAME,
+        createExpoConfigGradle(options),
+        '',
+    );
 
-    return insertManagedContent(withReactContent, ANDROID_BLOCK_NAME, androidContent, '');
+    return `${withAndroidContent.trimEnd()}\n\n${variantsBlock}\n`;
 }
 
 function createReactContent(
@@ -130,9 +143,7 @@ function createAndroidContent(
     return `    flavorDimensions += ${quoteGroovy('nativeVariant')}
     productFlavors {
 ${flavors}
-    }
-
-${createExpoConfigGradle(options)}${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
+    }${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
 }
 
 function quoteGroovy(value: string): string {
@@ -305,54 +316,82 @@ function findNamedBlock(source: string, name: string): NamedBlock {
 // Blanks comments and string contents (same length, newlines kept) so a block
 // name inside either cannot be mistaken for a real block opening.
 function maskCommentsAndStrings(source: string): string {
-    let masked = '';
-    let quote: '"' | "'" | undefined;
-    let escaped = false;
-    let lineComment = false;
-    let blockComment = false;
-
-    for (let index = 0; index < source.length; index += 1) {
-        const character = source[index]!;
-        const nextCharacter = source[index + 1];
-        const blank = character === '\n' ? '\n' : ' ';
-
-        if (lineComment) {
-            lineComment = character !== '\n';
-            masked += blank;
-        } else if (blockComment) {
-            masked += blank;
-            if (character === '*' && nextCharacter === '/') {
-                blockComment = false;
-                masked += ' ';
-                index += 1;
-            }
-        } else if (quote !== undefined) {
-            if (escaped) {
-                escaped = false;
-                masked += blank;
-            } else if (character === '\\') {
-                escaped = true;
-                masked += blank;
-            } else if (character === quote) {
-                quote = undefined;
-                masked += character;
-            } else {
-                masked += blank;
-            }
-        } else if (character === '/' && (nextCharacter === '/' || nextCharacter === '*')) {
-            lineComment = nextCharacter === '/';
-            blockComment = nextCharacter === '*';
-            masked += '  ';
-            index += 1;
-        } else {
-            if (character === '"' || character === "'") {
-                quote = character;
-            }
-            masked += character;
+    const masked = source.split('');
+    const blank = (start: number, end: number) => {
+        for (let offset = start; offset < end; offset += 1) {
+            if (source[offset] !== '\n' && source[offset] !== '\r') masked[offset] = ' ';
         }
-    }
+    };
 
-    return masked;
+    const scan = (from: number, interpolation = false): number => {
+        let index = from;
+        let depth = 0;
+        let canStartExpression = true;
+        while (index < source.length) {
+            const start = index;
+            const character = source[index]!;
+            if (/\s/.test(character)) {
+                index += 1;
+                continue;
+            }
+            if (source.startsWith('//', index) || source.startsWith('/*', index)) {
+                const line = source.startsWith('//', index);
+                const end = source.indexOf(line ? '\n' : '*/', index + 2);
+                index = end < 0 ? source.length : end + (line ? 0 : 2);
+                blank(start, index);
+                continue;
+            }
+            const delimiter = source.startsWith('$/', index) ? '$/'
+                : source.startsWith("'''", index) ? "'''"
+                : source.startsWith('"""', index) ? '"""'
+                : character === "'" || character === '"' ? character
+                : character === '/' && canStartExpression ? '/' : undefined;
+            if (delimiter !== undefined) {
+                index += delimiter.length;
+                const closing = delimiter === '$/' ? '/$' : delimiter;
+                while (index < source.length) {
+                    if (delimiter === '$/' && source[index] === '$' && /[$/]/.test(source[index + 1] ?? '')) {
+                        index += 2;
+                    } else if (delimiter !== "'" && delimiter !== "'".repeat(3) && source.startsWith('${', index)) {
+                        index = scan(index + 2, true);
+                    } else if (source.startsWith(closing, index)) {
+                        index += closing.length;
+                        break;
+                    } else if (delimiter !== '$/' && source[index] === '\\' &&
+                        (delimiter !== '/' || source[index + 1] === '/')) {
+                        index += 2;
+                    } else {
+                        index += 1;
+                    }
+                }
+                blank(start, Math.min(index, source.length));
+                masked[start] = '_';
+                canStartExpression = false;
+                continue;
+            }
+            const word = /^[A-Za-z_$][\w$]*|^\d+(?:\.\d+)?/.exec(source.slice(index));
+            if (word !== null) {
+                index += word[0].length;
+                canStartExpression = /^(return|throw|case|assert|in|instanceof|new|else)$/.test(word[0]);
+                continue;
+            }
+            if (source.startsWith('++', index) || source.startsWith('--', index)) {
+                index += 2;
+                continue;
+            }
+            if (interpolation && character === '}') {
+                if (depth === 0) return index + 1;
+                depth -= 1;
+            } else if (character === '{') {
+                depth += 1;
+            }
+            canStartExpression = !/[)\]}]/.test(character);
+            index += 1;
+        }
+        return index;
+    };
+    scan(0);
+    return masked.join('');
 }
 
 function findClosingBrace(source: string, openingBrace: number): number {
@@ -417,11 +456,15 @@ function findClosingBrace(source: string, openingBrace: number): number {
 }
 
 function beginMarker(blockName: ManagedBlockName): string {
-    return `    // ${PLUGIN_NAME}:begin ${blockName}`;
+    return `${markerIndent(blockName)}// ${PLUGIN_NAME}:begin ${blockName}`;
 }
 
 function endMarker(blockName: ManagedBlockName): string {
-    return `    // ${PLUGIN_NAME}:end ${blockName}`;
+    return `${markerIndent(blockName)}// ${PLUGIN_NAME}:end ${blockName}`;
+}
+
+function markerIndent(blockName: ManagedBlockName): string {
+    return blockName === VARIANTS_BLOCK_NAME ? '' : '    ';
 }
 
 function hashContent(content: string): string {

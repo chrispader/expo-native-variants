@@ -99,12 +99,15 @@ async function assertNativeChannels(root: string, preview = 'preview'): Promise<
   const phase = readChannelPhase(project);
   expect(phase).toBeDefined();
   const configurations: Record<string, unknown> = project.pbxXCBuildConfigurationSection();
-  for (const [name, channel] of [['Release-Production', 'production'], ['Release-Preview', preview], ['Release-Development', undefined], ['Release', 'production']]) {
+  for (const [name, channel] of [['Release-Production', 'production'], ['Release-Preview', preview], ['Release-Development', undefined], ['Release', undefined]]) {
     const settings = Object.values(configurations).filter(isRecord).find((configuration) =>
       configuration.name === name && isRecord(configuration.buildSettings) && 'PRODUCT_BUNDLE_IDENTIFIER' in configuration.buildSettings,
     )?.buildSettings;
     expect(isRecord(settings) ? settings[UPDATE_CHANNEL_BUILD_SETTING] : null)
       .toBe(channel === undefined ? undefined : JSON.stringify(channel));
+    if (name === 'Release') {
+      expect(isRecord(settings) ? settings.EXPO_NATIVE_VARIANT_KEY : null).toBe('"development"');
+    }
   }
 
   if (process.platform !== 'darwin' || phase === undefined) return;
