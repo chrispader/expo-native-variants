@@ -1,3 +1,7 @@
+import {mkdir, mkdtemp, writeFile} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {withNativeVariants} from '../src';
@@ -39,6 +43,30 @@ describe('withNativeVariants', () => {
     expect(config.android?.package).toBe('com.acme.app.dev');
     expect(config.ios?.bundleIdentifier).toBe('com.acme.app.dev');
     expect(config.scheme).toBe('com.acme.app.dev');
+  });
+
+  it.each([
+    [{CONFIGURATION: 'Debug'}, 'com.acme.app'],
+    [{CONFIGURATION: 'Release-Development'}, 'com.acme.app.dev'],
+    [{CONFIGURATION: 'Release', EXPO_NATIVE_VARIANT_KEY: 'development'}, 'com.acme.app.dev'],
+  ])('embeds the variant prebuild wrote into plain Xcode configurations: %j', async (
+    environment,
+    bundleIdentifier,
+  ) => {
+    const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
+    await mkdir(path.join(projectRoot, 'ios'));
+    await writeFile(
+      path.join(projectRoot, 'ios', 'Podfile.properties.json'),
+      JSON.stringify({'expo-native-variants.variant': 'production'}),
+    );
+    for (const [key, value] of Object.entries(environment)) vi.stubEnv(key, value);
+
+    const config = withNativeVariants(
+      {name: 'Acme', slug: 'acme', _internal: {projectRoot}},
+      {variants},
+    );
+
+    expect(config.ios?.bundleIdentifier).toBe(bundleIdentifier);
   });
 
   it('projects an explicit variant over existing identifiers', () => {

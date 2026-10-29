@@ -58,7 +58,7 @@ On iOS, use Xcode for custom configurations. Expo CLI 57 defaults to the ordinar
 
 ## Options
 
-Expo config evaluation uses the `development` variant when declared, otherwise the first declared variant. Set `NATIVE_VARIANT` when a tool needs the config for a different app. The plugin fills `ios.bundleIdentifier`, `android.package`, and `scheme`; no wrapper or `getUrlScheme` function is needed. It preserves additional, non-variant schemes after the preferred scheme. The selected variant also supplies the ordinary iOS `Debug` and `Release` configurations.
+Expo config evaluation uses the `development` variant when declared, otherwise the first declared variant. Set `NATIVE_VARIANT` when a tool needs the config for a different app. The plugin fills `ios.bundleIdentifier`, `android.package`, and `scheme`; no wrapper or `getUrlScheme` function is needed. It preserves additional, non-variant schemes after the preferred scheme. The selected variant also supplies the ordinary iOS `Debug` and `Release` configurations, and native builds of those configurations embed its Expo config even when Xcode builds them without `NATIVE_VARIANT`.
 
 `variants` is the only required plugin option. The optional `variant` property overrides `NATIVE_VARIANT` during Expo config evaluation, and `ios.targets` adds extension targets created by another plugin. Neither `variant` nor the environment variable limits the generated matrix: every variant is generated.
 

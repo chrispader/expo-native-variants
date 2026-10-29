@@ -6,6 +6,7 @@ import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIde
 import {normalizeNativeVariants} from './options';
 import {selectBuildVariant} from './options/selectBuildVariant';
 import {resolveVariantIcons} from './icons/resolve';
+import {readPrebuildVariant} from './ios/prebuildVariant';
 import type {NativeVariantsOptions, NormalizedNativeVariantsOptions} from './options';
 import {applySelectedVariantUpdateChannel, getNativeUpdateChannels} from './updates';
 import type {NativeUpdateChannels} from './updates';
@@ -19,6 +20,9 @@ export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, 
         options: {...options, variant: options?.variant ?? process.env.NATIVE_VARIANT},
       }),
       process.env,
+      process.env.CONFIGURATION === undefined
+        ? undefined
+        : readPrebuildVariant(config._internal?.projectRoot),
     ),
   );
 
