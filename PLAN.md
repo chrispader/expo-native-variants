@@ -56,7 +56,7 @@ Use `expo-native-variants` as the package name and `withNativeVariants` as the p
 
 The keys are user-defined, not limited to these three environments. `applicationId` supplies both platforms, with optional `ios.bundleIdentifier` and `android.applicationId` overrides. An optional `ios.xcodeScheme` can override the generated build-scheme name without confusing it with the deep-link scheme. Android flavor names derive from validated variant keys.
 
-The first declared variant supplies the default Expo identifiers and ordinary Debug/Release configurations. The optional plugin `variant` property selects another variant for tools such as EAS. The plugin writes the selected identifiers into app config during config evaluation. Neither selection reduces the set of generated variants.
+The `development` variant supplies the default Expo identifiers when declared, otherwise the first declared variant does. The selected variant supplies the ordinary Debug/Release configurations. The optional plugin `variant` property selects another variant for tools such as EAS. The plugin writes the selected identifiers into app config during config evaluation. Neither selection reduces the set of generated variants.
 
 Keep environment identity separate from build mode. Every variant gets debug and release builds. `runMode` selects the Xcode scheme's Run default, with debug as the default if omitted. It does not remove other build combinations or select an Android task implicitly.
 

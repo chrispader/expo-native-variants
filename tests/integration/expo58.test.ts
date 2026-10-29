@@ -15,15 +15,15 @@ const repositoryRoot = path.resolve(
   '..',
   '..',
 );
-const previewVersion = process.env.EXPO_58_VERSION ?? '58.0.0-preview.3';
+const expoVersion = process.env.EXPO_58_VERSION ?? '58.0.21';
 const runAdvisory = process.env.EXPO_NATIVE_VARIANTS_EXPO_58 === '1';
 
 let consumerRoot = '';
 
-describe.skipIf(!runAdvisory)('Expo 58 preview advisory', () => {
+describe.skipIf(!runAdvisory)('Expo 58', () => {
   beforeAll(async () => {
-    consumerRoot = await createPreviewConsumer();
-    await installPreview(consumerRoot);
+    consumerRoot = await createConsumer();
+    await installExpo(consumerRoot);
     await copyCompiledPackage(consumerRoot);
     await runPrebuild(consumerRoot);
   });
@@ -34,7 +34,7 @@ describe.skipIf(!runAdvisory)('Expo 58 preview advisory', () => {
     }
   });
 
-  it('generates the native variant matrix with the current preview', async () => {
+  it('generates the native variant matrix with Expo 58', async () => {
     const buildGradle = await readFile(
       path.join(consumerRoot, 'android', 'app', 'build.gradle'),
       'utf8',
@@ -60,7 +60,7 @@ describe.skipIf(!runAdvisory)('Expo 58 preview advisory', () => {
       await readdir(path.join(consumerRoot, 'ios'), {withFileTypes: true})
     ).find((entry) => entry.isDirectory() && entry.name.endsWith('.xcodeproj'));
     if (projectDirectory === undefined) {
-      throw new Error('Expo 58 preview did not generate an Xcode project.');
+      throw new Error('Expo 58 did not generate an Xcode project.');
     }
     const projectFile = path.join(
       consumerRoot,
@@ -75,16 +75,19 @@ describe.skipIf(!runAdvisory)('Expo 58 preview advisory', () => {
   });
 });
 
-async function createPreviewConsumer(): Promise<string> {
+async function createConsumer(): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), 'expo-native-variants-expo58-'));
   await Promise.all([
+    cp(path.join(repositoryRoot, 'example/assets/icons'), path.join(root, 'icons'), {
+      recursive: true,
+    }),
     writeFile(path.join(root, 'app.config.js'), APP_CONFIG, 'utf8'),
     writeFile(path.join(root, 'index.js'), '', 'utf8'),
     writeFile(
       path.join(root, 'package.json'),
       `${JSON.stringify(
         {
-          dependencies: {expo: previewVersion},
+          dependencies: {expo: expoVersion},
           main: 'index.js',
           name: 'native-variants-expo58-advisory',
           private: true,
@@ -97,14 +100,15 @@ async function createPreviewConsumer(): Promise<string> {
     ),
     writeFile(
       path.join(root, 'variant-settings.json'),
-      `${JSON.stringify(initialSettings('before').options, null, 2)}\n`,
+      // This consumer has no extension target plugin.
+      `${JSON.stringify({...initialSettings('before').options, ios: undefined}, null, 2)}\n`,
       'utf8',
     ),
   ]);
   return root;
 }
 
-async function installPreview(root: string): Promise<void> {
+async function installExpo(root: string): Promise<void> {
   await executeFile(
     process.platform === 'win32' ? 'bun.exe' : 'bun',
     ['install', '--ignore-scripts', '--cache-dir', path.join(root, '.cache')],
@@ -142,7 +146,7 @@ async function runPrebuild(root: string): Promise<void> {
     );
   } catch (error) {
     if (isExecutionError(error)) {
-      throw new Error(`Expo 58 preview prebuild failed.\n${error.stdout}\n${error.stderr}`);
+      throw new Error(`Expo 58 prebuild failed.\n${error.stdout}\n${error.stderr}`);
     }
     throw error;
   }
