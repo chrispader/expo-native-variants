@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/chrispader/expo-native-variants/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### Bug Fixes
+
+* default to the development variant ([#15](https://github.com/chrispader/expo-native-variants/issues/15)) ([779832b](https://github.com/chrispader/expo-native-variants/commit/779832baf3a4d0d4b5a74eedc6372542abb6c7e4))
+
+
+### Miscellaneous Chores
+
+* release 0.4.0 ([6dff015](https://github.com/chrispader/expo-native-variants/commit/6dff015a4a9a49d77f7d8c88c09c652926421a66))
+
 ## [0.3.0](https://github.com/chrispader/expo-native-variants/compare/v0.2.0...v0.3.0) (2026-10-01)
 
 

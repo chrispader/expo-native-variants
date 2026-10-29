@@ -75,7 +75,7 @@ describe('normalizeNativeVariants', () => {
     expect(result.variants.every(Object.isFrozen)).toBe(true);
   });
 
-  it('uses the first variant and derives optional display metadata', () => {
+  it('defaults to development without changing declaration order or display metadata', () => {
     const result = normalizeNativeVariants({
       configName: 'Acme',
       options: {
@@ -86,7 +86,8 @@ describe('normalizeNativeVariants', () => {
       },
     });
 
-    expect(result.selectedVariant.key).toBe('production');
+    expect(result.selectedVariant.key).toBe('development');
+    expect(result.variants.map(({key}) => key)).toEqual(['production', 'development']);
     expect(result.variants).toMatchObject([
       {
         displayName: 'Acme',
@@ -97,6 +98,15 @@ describe('normalizeNativeVariants', () => {
         urlScheme: 'com.acme.app.dev',
       },
     ]);
+  });
+
+  it('falls back to the first variant when development is absent', () => {
+    const result = normalizeNativeVariants({
+      configName: 'Acme',
+      options: {variants: {preview: variants.preview, production: variants.production}},
+    });
+
+    expect(result.selectedVariant.key).toBe('preview');
   });
 
   it('normalizes configured iOS extension targets', () => {

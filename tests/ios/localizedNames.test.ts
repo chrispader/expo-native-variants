@@ -1,5 +1,5 @@
 import {execFile} from 'node:child_process';
-import {mkdir, mkdtemp, readFile, readdir, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -82,7 +82,7 @@ describe('syncIosLocalizedNames', () => {
     ).resolves.toBe(`CFBundleDisplayName = "${escaped}";\n`);
   });
 
-  it('removes dropped languages and variants on rerun and writes nothing when no variant is localized', async () => {
+  it('removes dropped translations and retains an empty input list for bundle cleanup', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
     const args = {platformProjectRoot: root, projectDirectory: 'Acme'};
     await syncIosLocalizedNames({...args, options: withNames({fr: 'App', ar: 'تطبيق'})});
@@ -92,7 +92,8 @@ describe('syncIosLocalizedNames', () => {
     await expect(readdir(variantRoot)).resolves.toEqual(['ar.lproj']);
 
     await syncIosLocalizedNames({...args, options: withNames(undefined)});
-    await expect(readdir(path.join(root, 'Acme'))).rejects.toMatchObject({code: 'ENOENT'});
+    await expect(readdir(path.join(root, 'Acme/NativeVariants'))).resolves.toEqual(['development.xcfilelist']);
+    await expect(readFile(path.join(root, 'Acme/NativeVariants/development.xcfilelist'), 'utf8')).resolves.toBe('');
   });
 
   it('writes an empty input list for a variant without localized names when another has them', async () => {
@@ -148,7 +149,10 @@ describe('reconcileIosLocalizedNamesPhase', () => {
     expect(phase).toMatchObject({
       name: '"[expo-native-variants] Localize display names"',
       inputFileListPaths: ['"$(SRCROOT)/Acme/NativeVariants/$(EXPO_NATIVE_VARIANT_KEY).xcfilelist"'],
-      outputPaths: ['"$(DERIVED_FILE_DIR)/expo-native-variants-localized-names.stamp"'],
+      outputPaths: [
+        '"$(DERIVED_FILE_DIR)/expo-native-variants-localized-names.stamp"',
+        '"$(DERIVED_FILE_DIR)/expo-native-variants-localized-names"',
+      ],
       alwaysOutOfDate: 1,
     });
   });
@@ -272,5 +276,30 @@ describe.runIf(process.platform === 'darwin')('localized names build script', ()
 
     await expect(readStrings(app, 'fr')).resolves.toEqual({CFBundleDisplayName: 'Shared'});
     await expect(readdir(app)).resolves.toEqual(['fr.lproj']);
+  });
+
+  it('restores shared strings and removes owned translations after they are dropped', async () => {
+    const app = await runScript('development', 'CFBundleDisplayName = "Shared";\nNSCameraUsageDescription = "Caméra";\n');
+    const root = path.dirname(path.dirname(app));
+    await syncIosLocalizedNames({platformProjectRoot: root, projectDirectory: 'Acme', options: withNames(undefined)});
+    await execFileAsync('/bin/sh', ['-c', createLocalizedNamesScript('Acme')], {
+      env: {SRCROOT: root, TARGET_BUILD_DIR: app, UNLOCALIZED_RESOURCES_FOLDER_PATH: '.',
+        DERIVED_FILE_DIR: path.join(root, 'Derived'), EXPO_NATIVE_VARIANT_KEY: 'development'},
+    });
+    await expect(readStrings(app, 'fr')).resolves.toEqual({CFBundleDisplayName: 'Shared', NSCameraUsageDescription: 'Caméra'});
+    await expect(readFile(path.join(app, 'ar.lproj/InfoPlist.strings'))).rejects.toMatchObject({code: 'ENOENT'});
+  });
+
+  it('preserves a shared resource rewritten by Xcode before removing an override', async () => {
+    const app = await runScript('development', 'CFBundleDisplayName = "Shared";\n');
+    const root = path.dirname(path.dirname(app));
+    await writeFile(path.join(app, 'fr.lproj/InfoPlist.strings'), 'CFBundleDisplayName = "Updated shared";\n');
+    await rm(path.join(root, 'Acme/NativeVariants/development/fr.lproj'), {recursive: true});
+    await execFileAsync('/bin/sh', ['-c', createLocalizedNamesScript('Acme')], {
+      env: {SRCROOT: root, TARGET_BUILD_DIR: app, UNLOCALIZED_RESOURCES_FOLDER_PATH: '.',
+        DERIVED_FILE_DIR: path.join(root, 'Derived'), EXPO_NATIVE_VARIANT_KEY: 'development'},
+    });
+    await expect(readStrings(app, 'fr')).resolves.toEqual({CFBundleDisplayName: 'Updated shared'});
+    await expect(readStrings(app, 'ar')).resolves.toEqual({CFBundleDisplayName: 'تطبيق'});
   });
 });

@@ -34,6 +34,13 @@ function optionsWith(...languages: readonly (readonly string[])[]): NormalizedNa
 }
 
 describe('findLocaleNameCollisions', () => {
+  it.each([IOS_NAME_KEY, ANDROID_NAME_KEY] as const)('includes platform-specific locale names for %s', async (nameKey) => {
+    await expect(findLocaleNameCollisions({
+      locales: {fr: {ios: {CFBundleDisplayName: 'Shared'}, android: {app_name: 'Shared'}}},
+      nameKey, options: optionsWith([]), projectRoot: '/unused',
+    })).resolves.toEqual(['fr']);
+  });
+
   it('reports languages whose Expo locale file sets the app name for a variant without that language', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'expo-native-variants-'));
     await writeFile(path.join(root, 'fr.json'), JSON.stringify({CFBundleDisplayName: 'Shared'}));

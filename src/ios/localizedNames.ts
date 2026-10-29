@@ -1,4 +1,6 @@
 import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
 
 import type {XcodeProject} from 'expo/config-plugins';
 
@@ -23,18 +25,39 @@ export function createLocalizedNamesScript(projectDirectory: string): string {
   return `set -eu
 src="$SRCROOT/${shellEscape(projectDirectory)}/${VARIANT_DIRECTORY}/\${${VARIANT_KEY_BUILD_SETTING}:-}"
 dest_root="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+state="$DERIVED_FILE_DIR/expo-native-variants-localized-names"
+mkdir -p "$state"
+for previous in "$state"/*.lproj; do
+  [ -d "$previous" ] || continue
+  name="$(basename "$previous")"
+  dest="$dest_root/$name/InfoPlist.strings"
+  if [ -f "$dest" ] && cmp -s "$dest" "$previous/last.strings"; then
+    if [ -f "$previous/original.strings" ]; then
+      cp "$previous/original.strings" "$dest"
+    else
+      rm "$dest"
+      rmdir "$dest_root/$name" 2>/dev/null || true
+    fi
+  fi
+  rm -f "$previous/original.strings" "$previous/last.strings"
+  rmdir "$previous"
+done
 if [ -d "$src" ]; then
   for lproj in "$src"/*.lproj; do
     [ -d "$lproj" ] || continue
     name="$(basename "$lproj")"
     dest="$dest_root/$name/InfoPlist.strings"
     mkdir -p "$dest_root/$name"
+    previous="$state/$name"
+    mkdir -p "$previous"
     if [ -f "$dest" ]; then
+      cp "$dest" "$previous/original.strings"
       value="$(/usr/bin/plutil -extract CFBundleDisplayName raw -o - "$lproj/InfoPlist.strings")"
       /usr/bin/plutil -replace CFBundleDisplayName -string "$value" "$dest"
     else
       /usr/bin/plutil -convert binary1 -o "$dest" "$lproj/InfoPlist.strings"
     fi
+    cp "$dest" "$previous/last.strings"
   done
 fi
 touch "$DERIVED_FILE_DIR/expo-native-variants-localized-names.stamp"
@@ -57,11 +80,15 @@ export async function syncIosLocalizedNames({
   platformProjectRoot: string;
   projectDirectory: string;
   options: NormalizedNativeVariantsOptions;
-}>): Promise<void> {
+}>): Promise<boolean> {
   const files = new Map<string, Buffer>();
   if (collectLocalizedLanguages(options).length === 0) {
-    await syncGeneratedFiles(platformProjectRoot, STATE_FILE, files);
-    return;
+    try {
+      await readFile(path.join(platformProjectRoot, STATE_FILE));
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return false;
+      throw error;
+    }
   }
   // The phase reads one input list per variant, so every variant needs a file, even an empty one.
   for (const variant of options.variants) {
@@ -76,6 +103,7 @@ export async function syncIosLocalizedNames({
     files.set(`${variantRoot}.xcfilelist`, Buffer.from(inputs.map((input) => `${input}\n`).join(''), 'utf8'));
   }
   await syncGeneratedFiles(platformProjectRoot, STATE_FILE, files);
+  return true;
 }
 
 export function reconcileIosLocalizedNamesPhase({
@@ -111,7 +139,10 @@ export function reconcileIosLocalizedNamesPhase({
     'PBXShellScriptBuildPhase',
     LOCALIZED_NAMES_PHASE,
     targetUuid,
-    {shellPath: '/bin/sh', shellScript: '', inputPaths: [], outputPaths: [JSON.stringify(LOCALIZED_NAMES_STAMP)]},
+    {shellPath: '/bin/sh', shellScript: '', inputPaths: [], outputPaths: [
+      JSON.stringify(LOCALIZED_NAMES_STAMP),
+      JSON.stringify('$(DERIVED_FILE_DIR)/expo-native-variants-localized-names'),
+    ]},
   );
   const body = createLocalizedNamesScript(projectDirectory);
   const script = `# expo-native-variants:localized-names ${hash(body)}\n${body}`;

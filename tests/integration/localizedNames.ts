@@ -28,8 +28,10 @@ export async function assertLocalizedNamesPrebuild(
 
   await writeConfig(root, false);
   await prebuild(root, false);
-  expect(readPhases(root)).toHaveLength(0);
-  await expect(readdir(path.join(root, 'ios/Acme/NativeVariants'))).rejects.toMatchObject({code: 'ENOENT'});
+  expect(readPhases(root)).toHaveLength(1);
+  await expect(readdir(path.join(root, 'ios/Acme/NativeVariants'))).resolves.toEqual([
+    'development.xcfilelist', 'production.xcfilelist',
+  ]);
   await expect(readdir(path.join(root, 'android/app/src/development/res'))).resolves.toEqual(['values']);
 }
 

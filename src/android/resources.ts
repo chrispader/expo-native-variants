@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 import {mkdir, readFile, readdir, rmdir, unlink, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
+import {configPlugins} from '../configPlugins';
 import {syncGeneratedFiles} from '../files/generated';
 import type {NormalizedNativeVariantsOptions} from '../options';
 
@@ -49,11 +50,12 @@ function createLocalizedResourceFiles(
 }
 
 function createAppNameXml(displayName: string): string {
-    return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">${escapeAndroidString(displayName)}</string>\n</resources>\n`;
+    return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="app_name">${escapeStringResource(displayName)}</string>\n</resources>\n`;
 }
 
 function createResourceFile(displayName: string): string {
-    const body = `<resources>\n    <string name="app_name">${escapeAndroidString(displayName)}</string>\n</resources>\n`;
+    const body = `<resources>\n    <string name="app_name">${escapeStringResource(displayName)}</string>\n</resources>\n`;
+
     const hash = hashContent(body);
     return `<?xml version="1.0" encoding="utf-8"?>\n<!-- ${MARKER_PREFIX}${hash} -->\n${body}`;
 }
@@ -176,13 +178,10 @@ function hashContent(content: string): string {
     return createHash('sha256').update(content).digest('hex').slice(0, 16);
 }
 
-/** Escape for aapt2 string resources (backslash rules), then for XML text. */
-function escapeAndroidString(value: string): string {
-    return value
-        .replaceAll('\\', '\\\\')
-        .replaceAll("'", "\\'")
-        .replaceAll('"', '\\"')
-        .replace(/^[@?]/, '\\$&')
+/** Escapes like Expo's own `app_name`: aapt2 rules first, then XML text. */
+function escapeStringResource(value: string): string {
+    return configPlugins.XML.escapeAndroidString(value.replaceAll('\\', '\\\\'))
+        .replace(/^\?/, '\\?')
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');

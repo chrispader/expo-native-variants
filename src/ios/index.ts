@@ -11,6 +11,7 @@ import {
   IOS_NAME_KEY,
 } from '../localesCollision';
 import type {NormalizedNativeVariantsOptions} from '../options';
+import {patchDevLauncherStripPhase} from './devLauncher';
 import {findSharedUrlSchemes, updateInfoPlist} from './infoPlist';
 import {
   collectLocalizedLanguages,
@@ -18,6 +19,7 @@ import {
   syncIosLocalizedNames,
 } from './localizedNames';
 import {updatePodfile} from './podfile';
+import {PREBUILD_VARIANT_PROPERTY} from './prebuildVariant';
 import {syncSchemeFilesMod} from './schemeFiles';
 import {getXcodeProjectMetadata, updateXcodeProject} from './xcodeProject';
 import {reconcileIosUpdateChannelPhase} from './updates';
@@ -32,6 +34,7 @@ const {
   withInfoPlist,
   withExpoPlist,
   withPodfile,
+  withPodfileProperties,
 } = configPlugins;
 
 export const withIosVariants = (
@@ -39,6 +42,7 @@ export const withIosVariants = (
   options: NormalizedNativeVariantsOptions,
   updates: NativeUpdateChannels,
 ): ReturnType<ConfigPlugin> => {
+  let localizedNamesEnabled = collectLocalizedLanguages(options).length > 0;
   const expoSchemes = [
     `exp+${config.slug}`,
     ...options.variants.map((variant) => variant.iosBundleIdentifier),
@@ -71,6 +75,11 @@ export const withIosVariants = (
     return modConfig;
   });
 
+  config = withPodfileProperties(config, (modConfig) => {
+    modConfig.modResults[PREBUILD_VARIANT_PROPERTY] = options.selectedVariant.key;
+    return modConfig;
+  });
+
   if (updates.enabled) {
     config = withExpoPlist(config, (modConfig) => {
       const headers = restoreSharedUpdateChannel(
@@ -94,7 +103,7 @@ export const withIosVariants = (
         requireProjectName(modConfig.modRequest.projectName),
         options,
       );
-      await syncIosLocalizedNames({
+      localizedNamesEnabled = await syncIosLocalizedNames({
         platformProjectRoot: modConfig.modRequest.platformProjectRoot,
         projectDirectory: requireProjectName(modConfig.modRequest.projectName),
         options,
@@ -148,8 +157,9 @@ export const withIosVariants = (
       project,
       targetUuid: metadata.targetUuid,
       projectDirectory: requireProjectName(modConfig.modRequest.projectName),
-      enabled: collectLocalizedLanguages(options).length > 0,
+      enabled: localizedNamesEnabled,
     });
+    patchDevLauncherStripPhase(project);
     await writeFile(projectPath, project.writeSync(), 'utf8');
     return modConfig;
   }]);

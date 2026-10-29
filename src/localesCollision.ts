@@ -27,7 +27,12 @@ export async function findLocaleNameCollisions({
   const collisions: string[] = [];
   for (const [tag, source] of Object.entries(locales)) {
     const strings = await readLocaleStrings(source, projectRoot);
-    if (strings === undefined || !(nameKey in strings)) continue;
+    if (strings === undefined) continue;
+    const platform = strings[nameKey === IOS_NAME_KEY ? 'ios' : 'android'];
+    const resolved = typeof platform === 'object' && platform !== null
+      ? {...strings, ...platform}
+      : strings;
+    if (!(nameKey in resolved)) continue;
     const canonicalTag = canonicalizeTag(tag);
     const isOverridden = options.variants.every(
       (variant) => variant.localizedDisplayNames?.[canonicalTag] !== undefined,

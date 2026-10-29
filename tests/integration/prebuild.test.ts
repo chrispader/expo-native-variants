@@ -101,6 +101,24 @@ describe('compiled package prebuild', () => {
     );
     expect(count(manifest, '${nativeVariantScheme}')).toBe(1);
   });
+
+  it('embeds the prebuild variant in plain Xcode configurations', async () => {
+    await writeFile(
+      path.join(consumerRoot, 'app.config.js'),
+      `
+      const {ios, variant, ...options} = require('./variant-settings.json').options;
+      module.exports = {name: 'Acme', slug: 'acme', plugins: [['expo-native-variants', options]]};
+    `,
+    );
+    await writeSettings(consumerRoot, initialSettings('before'));
+    await runPrebuild(consumerRoot, true, {NATIVE_VARIANT: 'production'});
+
+    const config = await readEmbeddedExpoConfig(consumerRoot, 'plain-debug', {
+      CONFIGURATION: 'Debug',
+    });
+    expect(config.ios.bundleIdentifier).toBe('com.acme.app');
+    expect(config.scheme).toBe('acme');
+  });
 });
 
 async function createConsumer(): Promise<string> {
@@ -161,7 +179,11 @@ async function writeSettings(root: string, settings: PrebuildSettings): Promise<
   );
 }
 
-async function runPrebuild(root: string, clean: boolean): Promise<void> {
+async function runPrebuild(
+  root: string,
+  clean: boolean,
+  environment: Readonly<Record<string, string>> = {},
+): Promise<void> {
   const args = [expoCli, 'prebuild', '--no-install'];
   if (clean) {
     args.push('--clean');
@@ -177,6 +199,7 @@ async function runPrebuild(root: string, clean: boolean): Promise<void> {
         CI: '1',
         EXPO_NO_DOCTOR: '1',
         EXPO_OFFLINE: '1',
+        ...environment,
       },
       maxBuffer: 4 * 1024 * 1024,
     });
@@ -259,22 +282,31 @@ async function assertEmbeddedExpoConfig(root: string): Promise<void> {
     ['development', {EXPO_NATIVE_VARIANT_KEY: 'development'}],
     ['preview', {CONFIGURATION: 'Release-Preview'}],
   ] as const) {
-    const destination = path.join(root, 'embedded-config', key);
-    await mkdir(destination, {recursive: true});
-    await executeFile(
-      process.execPath,
-      ['-e', EXPO_CONFIG_COMMAND, '--', 'expo-native-variants', root, destination],
-      {
-        cwd: root,
-        env: {...process.env, ...environment},
-      },
-    );
-    const config = JSON.parse(await readFile(path.join(destination, 'app.config'), 'utf8'));
+    const config = await readEmbeddedExpoConfig(root, key, environment);
     expect(config.scheme).toBe(`acme-${key === 'development' ? 'dev' : key}`);
     expect(config.ios.bundleIdentifier).toBe(`com.acme.app.${key === 'development' ? 'dev' : key}`);
     expect(config.android.package).toBe(config.ios.bundleIdentifier);
     expect(config).not.toHaveProperty('mods');
   }
+}
+
+/** Runs the same expo-constants command that native builds use to embed the config. */
+async function readEmbeddedExpoConfig(
+  root: string,
+  label: string,
+  environment: Readonly<Record<string, string>>,
+) {
+  const destination = path.join(root, 'embedded-config', label);
+  await mkdir(destination, {recursive: true});
+  await executeFile(
+    process.execPath,
+    ['-e', EXPO_CONFIG_COMMAND, '--', 'expo-native-variants', root, destination],
+    {
+      cwd: root,
+      env: {...process.env, ...environment},
+    },
+  );
+  return JSON.parse(await readFile(path.join(destination, 'app.config'), 'utf8'));
 }
 
 async function assertNoRepeatedOutput(root: string): Promise<void> {
