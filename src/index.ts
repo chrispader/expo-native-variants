@@ -2,7 +2,10 @@ import type {ConfigPlugin} from 'expo/config-plugins';
 
 import {withAndroidVariants} from './android';
 import {withIosVariants} from './ios';
-import {applySelectedVariantIdentifiers} from './options/applySelectedVariantIdentifiers';
+import {
+  applySelectedExtensionIdentifiers,
+  applySelectedVariantIdentifiers,
+} from './options/applySelectedVariantIdentifiers';
 import {normalizeNativeVariants} from './options';
 import {selectBuildVariant} from './options/selectBuildVariant';
 import {resolveVariantIcons} from './icons/resolve';
@@ -31,10 +34,14 @@ export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, 
 
   const updates = getNativeUpdateChannels(config, normalizedOptions);
   const selectedConfig = applySelectedVariantUpdateChannel(
-    applySelectedVariantIdentifiers(
-      config,
+    applySelectedExtensionIdentifiers(
+      applySelectedVariantIdentifiers(
+        config,
+        normalizedOptions.selectedVariant,
+        normalizedOptions.variants,
+      ),
       normalizedOptions.selectedVariant,
-      normalizedOptions.variants,
+      normalizedOptions.iosTargets,
     ),
     normalizedOptions,
     updates,
