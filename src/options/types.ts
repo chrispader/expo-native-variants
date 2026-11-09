@@ -21,13 +21,33 @@ export type NativeVariantIosOptions = Readonly<{
   debugConfiguration?: string;
   releaseConfiguration?: string;
   icon?: NativeVariantIosIcon;
+  /**
+   * Build settings for the variant's application and extension configurations, such as
+   * `API_URL`. Info.plist values can read them as `$(API_URL)`.
+   */
+  buildSettings?: Readonly<Record<string, NativeVariantIosBuildSettingValue>>;
+  /** Environment variables the Xcode scheme passes when running, testing, or profiling. */
+  environmentVariables?: Readonly<Record<string, string>>;
+  /** Launch arguments the Xcode scheme passes when running, testing, or profiling. */
+  launchArguments?: readonly string[];
 }>;
+
+export type NativeVariantIosBuildSettingValue = string | readonly string[];
+
+/** Strings become `String`, booleans `boolean`, integers `int`, and other numbers `double`. */
+export type NativeVariantBuildConfigFieldValue = string | number | boolean;
 
 export type NativeVariantAndroidOptions = Readonly<{
   applicationId?: string;
   flavor?: string;
   icon?: string;
   adaptiveIcon?: NativeVariantAdaptiveIcon;
+  /** Fields on the generated `BuildConfig` class, such as `BuildConfig.API_URL`. */
+  buildConfigFields?: Readonly<Record<string, NativeVariantBuildConfigFieldValue>>;
+  /** String resources, readable as `@string/name` or `getString(R.string.name)`. */
+  resValues?: Readonly<Record<string, string>>;
+  /** Values that AndroidManifest.xml can read as `${name}`. */
+  manifestPlaceholders?: Readonly<Record<string, string>>;
 }>;
 
 export type NativeVariantsIosTargetOptions = Readonly<{
@@ -88,6 +108,12 @@ export type NormalizedNativeVariant = Readonly<{
   iosIcon?: NativeVariantIosIcon;
   androidIcon?: string;
   androidAdaptiveIcon?: NativeVariantAdaptiveIcon;
+  iosBuildSettings?: Readonly<Record<string, NativeVariantIosBuildSettingValue>>;
+  iosEnvironmentVariables?: Readonly<Record<string, string>>;
+  iosLaunchArguments?: readonly string[];
+  androidBuildConfigFields?: Readonly<Record<string, NativeVariantBuildConfigFieldValue>>;
+  androidResValues?: Readonly<Record<string, string>>;
+  androidManifestPlaceholders?: Readonly<Record<string, string>>;
 }>;
 
 export type NormalizedNativeVariantsIosTarget = Readonly<{

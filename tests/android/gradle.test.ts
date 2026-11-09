@@ -103,6 +103,31 @@ describe('reconcileAppBuildGradle', () => {
         expect(result).toContain('applicationId "com.helloworld"');
     });
 
+    it('writes variant BuildConfig fields, string resources, and manifest placeholders', () => {
+        const [development, production] = OPTIONS.variants;
+        const result = reconcileAppBuildGradle(EXPO_GRADLE, {
+            ...OPTIONS,
+            variants: [
+                {
+                    ...development!,
+                    androidBuildConfigFields: {API_URL: 'https://dev.acme.com/$path', ENABLED: true, RETRIES: 3, RATIO: 0.5, LIMIT: 2 ** 40},
+                    androidResValues: {api_label: "Dev's \"API\""},
+                    androidManifestPlaceholders: {mapsKey: 'dev-key'},
+                },
+                production!,
+            ],
+        });
+
+        expect(result).toContain(String.raw`buildConfigField("String", "API_URL", "\"https://dev.acme.com/\$path\"")`);
+        expect(result).toContain('buildConfigField("boolean", "ENABLED", "true")');
+        expect(result).toContain('buildConfigField("int", "RETRIES", "3")');
+        expect(result).toContain('buildConfigField("double", "RATIO", "0.5")');
+        expect(result).toContain('buildConfigField("long", "LIMIT", "1099511627776L")');
+        expect(result).toContain(String.raw`resValue("string", "api_label", "Dev\\'s \\\"API\\\"")`);
+        expect(result).toContain('manifestPlaceholders["mapsKey"] = "dev-key"');
+        expect(result.match(/buildConfigField/g)).toHaveLength(5);
+    });
+
     it('registers the embedded Expo config through the variant API outside the android block', () => {
         const result = reconcileAppBuildGradle(EXPO_GRADLE, OPTIONS);
         const variantsBlock = result.slice(result.indexOf('// expo-native-variants:begin variants'));

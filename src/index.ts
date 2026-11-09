@@ -53,6 +53,8 @@ export const withNativeVariants: ConfigPlugin<NativeVariantsOptions> = (config, 
 export {normalizeNativeVariants} from './options';
 export type {
   NativeVariantAdaptiveIcon,
+  NativeVariantBuildConfigFieldValue,
+  NativeVariantIosBuildSettingValue,
   NativeVariantIosIcon,
   NativeVariantAndroidOptions,
   NativeVariantIosOptions,

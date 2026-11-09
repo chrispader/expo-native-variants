@@ -77,6 +77,7 @@ export function createScheme(args: CreateSchemeArgs): SchemeXmlObject {
               BuildableReference: [debugBuildable],
             },
           ],
+          ...createLaunchArgsAndEnvironment(variant),
         },
       ],
       ProfileAction: [
@@ -106,6 +107,35 @@ export function createScheme(args: CreateSchemeArgs): SchemeXmlObject {
         },
       ],
     },
+  };
+}
+
+/** Test and Profile actions reuse these through shouldUseLaunchSchemeArgsEnv. */
+function createLaunchArgsAndEnvironment(variant: NormalizedNativeVariant): SchemeXmlObject {
+  const {iosEnvironmentVariables, iosLaunchArguments} = variant;
+  return {
+    ...(iosLaunchArguments === undefined
+      ? {}
+      : {
+          CommandLineArguments: [
+            {
+              CommandLineArgument: iosLaunchArguments.map((argument) => ({
+                $: {argument, isEnabled: 'YES'},
+              })),
+            },
+          ],
+        }),
+    ...(iosEnvironmentVariables === undefined
+      ? {}
+      : {
+          EnvironmentVariables: [
+            {
+              EnvironmentVariable: Object.entries(iosEnvironmentVariables).map(([key, value]) => ({
+                $: {key, value, isEnabled: 'YES'},
+              })),
+            },
+          ],
+        }),
   };
 }
 

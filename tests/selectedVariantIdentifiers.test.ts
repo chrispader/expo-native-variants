@@ -38,6 +38,7 @@ describe('applySelectedVariantIdentifiers', () => {
       applySelectedVariantIdentifiers(
         {
           android: {package: 'com.acme.previous'},
+          extra: {apiUrl: 'https://acme.com'},
           ios: {bundleIdentifier: 'com.acme.previous'},
           name: 'Acme',
           slug: 'acme',
@@ -46,6 +47,7 @@ describe('applySelectedVariantIdentifiers', () => {
       ),
     ).toMatchObject({
       android: {package: 'com.acme.app'},
+      extra: {apiUrl: 'https://acme.com', nativeVariant: 'production'},
       ios: {bundleIdentifier: 'com.acme.app'},
     });
   });

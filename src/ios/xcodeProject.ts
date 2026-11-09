@@ -11,6 +11,7 @@ import {
 } from './infoPlist';
 
 import {applyIosIconBuildSettings} from '../icons/resolve';
+import {applyVariantBuildSettings} from './buildSettings';
 import {UPDATE_CHANNEL_BUILD_SETTING} from './updates';
 
 const {Target, XcodeUtils} = configPlugins.IOSConfig;
@@ -369,6 +370,7 @@ function applyVariantSettings(
   variant: NormalizedNativeVariant,
   owner: Exclude<ConfigurationOwner, Readonly<{type: 'project'}>>,
 ): void {
+  applyVariantBuildSettings(configuration.buildSettings, variant);
   configuration.buildSettings[VARIANT_KEY_BUILD_SETTING] = quote(variant.key);
   configuration.buildSettings[APPLICATION_IDENTIFIER_BUILD_SETTING] = quote(
     variant.iosBundleIdentifier,

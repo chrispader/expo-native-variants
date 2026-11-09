@@ -51,4 +51,24 @@ describe(createScheme, () => {
       /<LaunchAction[\s\S]*?buildConfiguration="Release-Development"/,
     );
   });
+
+  it('passes variant launch arguments and environment variables to the Run action', () => {
+    const contents = formatScheme(
+      createScheme({
+        variant: {
+          ...variant,
+          iosLaunchArguments: ['-FIRDebugEnabled'],
+          iosEnvironmentVariables: {API_URL: 'https://dev.acme.com?a=1&b=2'},
+        },
+        targetUuid: 'TARGET_UUID',
+        targetName: 'Acme',
+        productName: 'Acme',
+        projectName: 'Acme',
+      }),
+    );
+
+    expect(contents).toMatch(
+      /<LaunchAction[\s\S]*<CommandLineArgument argument="-FIRDebugEnabled" isEnabled="YES"\/>[\s\S]*<EnvironmentVariable key="API_URL" value="https:\/\/dev.acme.com\?a=1&amp;b=2" isEnabled="YES"\/>[\s\S]*<\/LaunchAction>/,
+    );
+  });
 });

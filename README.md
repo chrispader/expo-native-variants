@@ -82,6 +82,43 @@ Expo config evaluation uses the `development` variant when declared, otherwise t
 | `android.flavor` | Optional Android product flavor name, starting with a lowercase letter |
 | `android.icon` | Optional Android launcher image |
 | `android.adaptiveIcon` | Optional `foregroundImage`, `backgroundImage`, `backgroundColor`, and `monochromeImage` |
+| `ios.buildSettings` | Optional Xcode build settings for this variant's configurations (see [Native settings](#native-settings)) |
+| `ios.environmentVariables` | Optional environment variables the variant's Xcode scheme passes to the app |
+| `ios.launchArguments` | Optional launch arguments the variant's Xcode scheme passes to the app |
+| `android.buildConfigFields` | Optional fields on the generated `BuildConfig` class |
+| `android.resValues` | Optional string resources |
+| `android.manifestPlaceholders` | Optional values that `AndroidManifest.xml` reads as `${name}` |
+
+### Native settings
+
+Each variant can pass its own values to the native projects. The plugin forwards them to Xcode and Gradle as written. It doesn't keep a list of supported settings, so any Xcode build setting works, with Xcode's own syntax such as `$(inherited)`.
+
+```ts
+export const variants = {
+  production: {applicationId: 'com.example.app'},
+  staging: {
+    applicationId: 'com.example.app',
+    displayName: 'MyApp Staging',
+    ios: {
+      buildSettings: {
+        API_URL: 'https://staging.example.com',
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: ['$(inherited)', 'STAGING'],
+      },
+      environmentVariables: {OS_ACTIVITY_MODE: 'disable'},
+      launchArguments: ['-FIRDebugEnabled'],
+    },
+    android: {
+      buildConfigFields: {API_URL: 'https://staging.example.com', LOGGING: true},
+      resValues: {api_label: 'Staging'},
+      manifestPlaceholders: {mapsApiKey: 'staging-key'},
+    },
+  },
+} satisfies NativeVariantMap;
+```
+
+`ios.buildSettings` applies to the variant's Debug and Release configurations for the app and its configured extension targets. To read a build setting at runtime, reference it from Info.plist, for example `ios: {infoPlist: {ApiUrl: '$(API_URL)'}}` in the Expo config. When you remove a setting or select another prebuild variant, the next prebuild restores the value that was there before. The scheme's environment variables and launch arguments apply only when Xcode runs, tests, or profiles the app.
+
+`android.buildConfigFields` turns strings into `String` fields, booleans into `boolean`, integers into `int` or `long`, and other numbers into `double`. `android.resValues` creates string resources that native code reads as `R.string.api_label`. Names must start with a letter or underscore and contain only letters, numbers, and underscores. The plugin rejects settings it manages itself, such as `PRODUCT_BUNDLE_IDENTIFIER`, the `app_name` string, and the `nativeVariantScheme` placeholder.
 
 ### Localized display names
 
@@ -197,7 +234,11 @@ const applicationGroups = [
 
 For example, pass that array through `ios.entitlements` for the app and through the extension generator's entitlements configuration. Xcode expands it to the main application bundle identifier for each configuration, so an extension and its containing app share `group.com.example.app.dev` in development and `group.com.example.app` in production.
 
-Variant keys determine the Android flavor names and generated iOS configuration names. Identifiers must be unique on each platform. The plugin rejects invalid names and collisions before generating native settings.
+Variant keys determine the Android flavor names and generated iOS configuration names. The plugin rejects invalid names and collisions before generating native settings.
+
+### Shared identifiers
+
+Variants can share an application identifier. They then install over each other instead of side by side, which suits variants that only change settings, such as a staging build of the production app. Installing one keeps the other's data, Keychain items, and login state, so clear the data when a variant switches backends. Variants that share a URL scheme must also share their identifiers on both platforms, so a link always opens one installed app.
 
 The plugin changes the display name while keeping the native target, product name, and Android source namespace stable. It owns its generated files and configuration sections. Repeated prebuilds update them, including renamed or removed variants. If you remove the plugin itself, perform a clean prebuild to remove its native output.
 
@@ -215,6 +256,18 @@ const variant = getNativeVariant(Application.applicationId, variants);
 ```
 
 The helper returns the variant key or `null` when the identifier is missing, unknown, or ambiguous. It never assumes production for Expo Go or web. Pass a third argument, `'ios'` or `'android'`, if your map reuses the same identifier for different variants across platforms.
+
+Variants that share an identifier return `null` because the identifier is ambiguous. For those, read the variant key that the plugin writes to the Expo config:
+
+```ts
+import Constants from 'expo-constants';
+
+const variant =
+  getNativeVariant(Application.applicationId, variants) ??
+  Constants.expoConfig?.extra?.nativeVariant;
+```
+
+Release builds embed the variant's own Expo config. Development builds read the config from the development server, and updates carry the config they were published with. Start the server or publish the update with `NATIVE_VARIANT` set to the variant you want.
 
 The runtime helper contains no config-plugin code and requires no native module of its own. The installed application's identifier remains the source of identity when JavaScript is reloaded or updated. A scheme change does not change bundled `EXPO_PUBLIC_*` variables or Expo's shared `extra` values.
 

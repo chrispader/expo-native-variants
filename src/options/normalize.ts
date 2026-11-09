@@ -8,6 +8,7 @@ import type {
   NormalizeNativeVariantsArgs,
 } from './types';
 import {readAdaptiveIcon, readIconPath, readIosIcon} from './icons';
+import {readAndroidNativeSettings, readIosNativeSettings} from './nativeSettings';
 
 const ROOT_KEYS = new Set(['ios', 'variant', 'variants']);
 const ROOT_IOS_KEYS = new Set(['targets']);
@@ -28,8 +29,19 @@ const IOS_KEYS = new Set([
   'debugConfiguration',
   'releaseConfiguration',
   'icon',
+  'buildSettings',
+  'environmentVariables',
+  'launchArguments',
 ]);
-const ANDROID_KEYS = new Set(['applicationId', 'flavor', 'icon', 'adaptiveIcon']);
+const ANDROID_KEYS = new Set([
+  'applicationId',
+  'flavor',
+  'icon',
+  'adaptiveIcon',
+  'buildConfigFields',
+  'resValues',
+  'manifestPlaceholders',
+]);
 const RESERVED_VARIANT_NAMES = new Set([
   'androidtest',
   'aux',
@@ -160,6 +172,17 @@ function normalizeVariant({
   const runMode = readRunMode(variantRecord.runMode, key);
   const ios = readIosOptions(variantRecord.ios, key);
   const android = readAndroidOptions(variantRecord.android, key);
+  // readIosOptions and readAndroidOptions already rejected non-object values.
+  const nativeSettings = {
+    ...readIosNativeSettings(
+      isRecord(variantRecord.ios) ? variantRecord.ios : {},
+      `Variant "${key}" ios`,
+    ),
+    ...readAndroidNativeSettings(
+      isRecord(variantRecord.android) ? variantRecord.android : {},
+      `Variant "${key}" android`,
+    ),
+  };
   const iosBundleIdentifier = ios.bundleIdentifier ?? applicationId;
   const androidApplicationId = android.applicationId ?? applicationId;
   validateIosIdentifier(iosBundleIdentifier, `Variant "${key}" iOS bundle identifier`);
@@ -208,6 +231,7 @@ function normalizeVariant({
     ...(ios.icon === undefined ? {} : {iosIcon: ios.icon}),
     ...(android.icon === undefined ? {} : {androidIcon: android.icon}),
     ...(android.adaptiveIcon === undefined ? {} : {androidAdaptiveIcon: android.adaptiveIcon}),
+    ...nativeSettings,
   });
 }
 
@@ -380,18 +404,22 @@ function validateGeneratedNames(variants: readonly NormalizedNativeVariant[]): v
   assertUnique(variants, ({androidFlavor}) => androidFlavor.toLowerCase(), 'Android flavor');
 }
 
+/**
+ * Variants may share identifiers; they then install over each other. A URL scheme
+ * must still route to a single installable app on each platform.
+ */
 function validateUniqueValues(variants: readonly NormalizedNativeVariant[]): void {
-  assertUnique(
-    variants,
-    ({iosBundleIdentifier}) => iosBundleIdentifier.toLowerCase(),
-    'iOS bundle identifier',
-  );
-  assertUnique(
-    variants,
-    ({androidApplicationId}) => androidApplicationId.toLowerCase(),
-    'Android application ID',
-  );
-  assertUnique(variants, ({urlScheme}) => urlScheme.toLowerCase(), 'URL scheme');
+  const ownerByScheme = new Map<string, NormalizedNativeVariant>();
+  for (const variant of variants) {
+    const scheme = variant.urlScheme.toLowerCase();
+    const owner = ownerByScheme.get(scheme);
+    if (owner !== undefined && !sharesIdentifiers(owner, variant)) {
+      throw new Error(
+        `Variants "${owner.key}" and "${variant.key}" produce the same URL scheme "${variant.urlScheme}" but have different identifiers.`,
+      );
+    }
+    ownerByScheme.set(scheme, variant);
+  }
   assertNoCrossVariantRouteCollision({
     identifierLabel: 'iOS bundle identifier',
     selectIdentifier: ({iosBundleIdentifier}) => iosBundleIdentifier,
@@ -402,6 +430,13 @@ function validateUniqueValues(variants: readonly NormalizedNativeVariant[]): voi
     selectIdentifier: ({androidApplicationId}) => androidApplicationId,
     variants,
   });
+}
+
+function sharesIdentifiers(left: NormalizedNativeVariant, right: NormalizedNativeVariant): boolean {
+  return (
+    left.iosBundleIdentifier.toLowerCase() === right.iosBundleIdentifier.toLowerCase() &&
+    left.androidApplicationId.toLowerCase() === right.androidApplicationId.toLowerCase()
+  );
 }
 
 function validateBundleIdentifierSuffix({
@@ -431,6 +466,9 @@ function assertUniqueIosTargets(
   variants: readonly NormalizedNativeVariant[],
 ): void {
   const targetByName = new Map<string, string>();
+  const variantsByIdentifier = new Map(
+    variants.map((variant) => [variant.iosBundleIdentifier.toLowerCase(), variant]),
+  );
   const identifierOwnerByValue = new Map(
     variants.map((variant) => [
       variant.iosBundleIdentifier.toLowerCase(),
@@ -448,7 +486,8 @@ function assertUniqueIosTargets(
     }
     targetByName.set(normalizedName, target.name);
 
-    for (const variant of variants) {
+    // Variants that share an application identifier also share its extension identifiers.
+    for (const variant of variantsByIdentifier.values()) {
       const identifier = `${variant.iosBundleIdentifier}${target.bundleIdentifierSuffix}`;
       const normalizedIdentifier = identifier.toLowerCase();
       const owner = identifierOwnerByValue.get(normalizedIdentifier);
@@ -474,15 +513,16 @@ function assertNoCrossVariantRouteCollision({
   selectIdentifier: (variant: NormalizedNativeVariant) => string;
   variants: readonly NormalizedNativeVariant[];
 }>): void {
-  const identifierOwnerByValue = new Map(
-    variants.map((variant) => [selectIdentifier(variant).toLowerCase(), variant.key]),
-  );
-
   for (const variant of variants) {
-    const identifierOwner = identifierOwnerByValue.get(variant.urlScheme.toLowerCase());
-    if (identifierOwner !== undefined && identifierOwner !== variant.key) {
+    const scheme = variant.urlScheme.toLowerCase();
+    const identifier = selectIdentifier(variant).toLowerCase();
+    const identifierOwner = variants.find((other) => {
+      const otherIdentifier = selectIdentifier(other).toLowerCase();
+      return otherIdentifier === scheme && otherIdentifier !== identifier;
+    });
+    if (identifierOwner !== undefined) {
       throw new Error(
-        `Variant "${variant.key}" URL scheme "${variant.urlScheme}" matches variant "${identifierOwner}" ${identifierLabel}.`,
+        `Variant "${variant.key}" URL scheme "${variant.urlScheme}" matches variant "${identifierOwner.key}" ${identifierLabel}.`,
       );
     }
   }
