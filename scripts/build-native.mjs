@@ -6,6 +6,7 @@ import {
   copyFile,
   mkdir,
   readFile,
+  readdir,
   rm,
   stat,
 } from 'node:fs/promises';
@@ -75,6 +76,7 @@ async function buildAndroid() {
         logPath,
       });
       await verifyBundleMode({bundlePath, mode, label: `Android ${variantName}`});
+      await verifyAndroidApiUrl({variant, mode, variantName});
       await collectAndroidArtifact({variant, mode, variantName});
     }
   }
@@ -116,6 +118,33 @@ async function collectAndroidArtifact({variant, mode, variantName}) {
   );
   await mkdir(path.dirname(destination), {recursive: true});
   await copyFile(apkPath, destination);
+}
+
+async function verifyAndroidApiUrl({variant, mode, variantName}) {
+  if (variant.androidApiUrl === undefined) {
+    return;
+  }
+  const directory = path.join(
+    exampleRoot,
+    'android',
+    'app',
+    'build',
+    'generated',
+    'source',
+    'buildConfig',
+    variant.androidFlavor,
+    mode,
+  );
+  const files = await readdir(directory, {recursive: true});
+  const buildConfig = files.find((file) => path.basename(file) === 'BuildConfig.java');
+  if (buildConfig === undefined) {
+    throw new Error(`${variantName} did not generate BuildConfig.java.`);
+  }
+  const source = await readFile(path.join(directory, buildConfig), 'utf8');
+  const expected = `String API_URL = ${JSON.stringify(variant.androidApiUrl)};`;
+  if (!source.includes(expected)) {
+    throw new Error(`${variantName} BuildConfig.java does not contain ${expected}`);
+  }
 }
 
 async function buildIos() {
@@ -223,6 +252,15 @@ async function collectIosArtifact({
     throw new Error(
       `${configuration} produced display name ${JSON.stringify(displayName)} instead of ${JSON.stringify(variant.displayName)}.`,
     );
+  }
+  if (variant.iosApiUrl !== undefined) {
+    // The example Info.plist sets ApiUrl to $(API_URL), which the variant's build settings define.
+    const apiUrl = await readPlistValue(infoPlistPath, 'ApiUrl');
+    if (apiUrl !== variant.iosApiUrl) {
+      throw new Error(
+        `${configuration} produced API URL ${JSON.stringify(apiUrl)} instead of ${JSON.stringify(variant.iosApiUrl)}.`,
+      );
+    }
   }
 
   const destination = path.join(artifactRoot, 'ios', `${buildName}.app.tar.gz`);
@@ -342,6 +380,8 @@ async function readVariants() {
       releaseConfiguration: value.ios?.releaseConfiguration ?? `Release-${configurationLabel}`,
       iosBundleIdentifier: value.ios?.bundleIdentifier ?? value.applicationId,
       iosScheme: value.ios?.xcodeScheme,
+      iosApiUrl: value.ios?.buildSettings?.API_URL,
+      androidApiUrl: value.android?.buildConfigFields?.API_URL,
       configurationLabel,
     };
   });
