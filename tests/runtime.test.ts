@@ -12,8 +12,10 @@ const variants = {
     urlScheme: 'acme-dev',
   },
   production: {
+    android: {buildConfigFields: {API_URL: 'https://api.acme.com'}},
     applicationId: 'com.acme.app',
     displayName: 'Acme',
+    ios: {buildSettings: {API_URL: 'https://api.acme.com'}},
     urlScheme: 'acme',
   },
 };
