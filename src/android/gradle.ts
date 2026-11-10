@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 
-import type {NormalizedNativeVariantsOptions} from '../options';
+import type {NormalizedNativeVariant, NormalizedNativeVariantsOptions} from '../options';
 import {createExpoConfigGradle} from './expoConfig';
+import {escapeAaptString} from './resources';
 import {createUpdateChannelsGradle} from './updates';
 
 const PLUGIN_NAME = 'expo-native-variants';
@@ -131,13 +132,9 @@ function createAndroidContent(
     updatesEnabled: boolean,
 ): string {
     const flavors = options.variants
-        .map(
-            ({androidApplicationId, androidFlavor, urlScheme}) => `        ${androidFlavor} {
-            dimension ${quoteGroovy('nativeVariant')}
-            applicationId(${quoteGroovy(androidApplicationId)})
-            manifestPlaceholders[${quoteGroovy('nativeVariantScheme')}] = ${quoteGroovy(urlScheme)}
-        }`,
-        )
+        .map((variant) => `        ${variant.androidFlavor} {
+${createFlavorLines(variant).map((line) => `            ${line}`).join('\n')}
+        }`)
         .join('\n');
 
     return `    flavorDimensions += ${quoteGroovy('nativeVariant')}
@@ -146,8 +143,46 @@ ${flavors}
     }${updatesEnabled ? `\n\n${createUpdateChannelsGradle(options)}` : ''}`;
 }
 
+function createFlavorLines(variant: NormalizedNativeVariant): readonly string[] {
+    const placeholders = {
+        nativeVariantScheme: variant.urlScheme,
+        ...variant.androidManifestPlaceholders,
+    };
+    return [
+        `dimension ${quoteGroovy('nativeVariant')}`,
+        `applicationId(${quoteGroovy(variant.androidApplicationId)})`,
+        ...Object.entries(placeholders).map(
+            ([name, value]) => `manifestPlaceholders[${quoteGroovy(name)}] = ${quoteGroovy(value)}`,
+        ),
+        ...Object.entries(variant.androidBuildConfigFields ?? {}).map(([name, value]) => {
+            const [type, literal] = toJavaLiteral(value);
+            return `buildConfigField(${quoteGroovy(type)}, ${quoteGroovy(name)}, ${quoteGroovy(literal)})`;
+        }),
+        ...Object.entries(variant.androidResValues ?? {}).map(
+            ([name, value]) =>
+                `resValue(${quoteGroovy('string')}, ${quoteGroovy(name)}, ${quoteGroovy(escapeAaptString(value))})`,
+        ),
+    ];
+}
+
+function toJavaLiteral(value: string | number | boolean): readonly [type: string, literal: string] {
+    if (typeof value === 'string') {
+        return ['String', JSON.stringify(value)];
+    }
+    if (typeof value === 'boolean') {
+        return ['boolean', String(value)];
+    }
+    if (!Number.isInteger(value)) {
+        return ['double', String(value)];
+    }
+    return value >= -(2 ** 31) && value < 2 ** 31 ? ['int', String(value)] : ['long', `${value}L`];
+}
+
 function quoteGroovy(value: string): string {
-    const escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+    const escaped = value
+        .replaceAll('\\', '\\\\')
+        .replaceAll('"', '\\"')
+        .replaceAll('$', '\\$');
     return `"${escaped}"`;
 }
 

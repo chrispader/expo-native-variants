@@ -2,8 +2,9 @@ export type NativeVariantPlatform = 'android' | 'ios';
 
 export type NativeVariantIdentifier = Readonly<{
   applicationId: string;
-  ios?: Readonly<{bundleIdentifier?: string}>;
-  android?: Readonly<{applicationId?: string}>;
+  // The index signatures accept variants whose platform options set only other keys, such as buildSettings.
+  ios?: Readonly<{bundleIdentifier?: string; [key: string]: unknown}>;
+  android?: Readonly<{applicationId?: string; [key: string]: unknown}>;
 }>;
 
 export type NativeVariantIdentifierMap = Readonly<

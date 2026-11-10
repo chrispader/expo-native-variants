@@ -68,6 +68,41 @@ describe(updateXcodeProject, () => {
         .ASSETCATALOG_COMPILER_APPICON_NAME,
     ).toBe('AppIcon');
   });
+  it('applies variant build settings and restores replaced values on the next prebuild', () => {
+    const fixture = createProjectFixture();
+    addExtensionTarget(fixture);
+    const settingsDevelopment = {
+      ...development,
+      iosBuildSettings: {API_URL: 'https://dev.acme.com', OTHER_SWIFT_FLAGS: ['$(inherited)', '-DDEV']},
+    };
+    const settingsProduction = {...production, iosBuildSettings: {API_URL: 'https://acme.com'}};
+    updateXcodeProject(fixture.project, {
+      ...extensionOptions,
+      selectedVariant: settingsProduction,
+      variants: [settingsDevelopment, settingsProduction],
+    });
+
+    const developmentSettings = getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Debug-Development').buildSettings;
+    expect(developmentSettings.API_URL).toBe('"https://dev.acme.com"');
+    expect(developmentSettings.OTHER_SWIFT_FLAGS).toEqual(['"$(inherited)"', '"-DDEV"']);
+    expect(
+      getConfiguration(fixture, 'EXTENSION_CONFIG_LIST', 'Release-Development').buildSettings.API_URL,
+    ).toBe('"https://dev.acme.com"');
+    expect(getConfiguration(fixture, 'TARGET_CONFIG_LIST', 'Release').buildSettings.API_URL).toBe(
+      '"https://acme.com"',
+    );
+    expect(
+      getConfiguration(fixture, 'PROJECT_CONFIG_LIST', 'Debug-Development').buildSettings,
+    ).not.toHaveProperty('API_URL');
+
+    updateXcodeProject(fixture.project, extensionOptions);
+    for (const name of ['Debug', 'Release', 'Debug-Development', 'Release-Production']) {
+      const settings = getConfiguration(fixture, 'TARGET_CONFIG_LIST', name).buildSettings;
+      expect(settings).not.toHaveProperty('API_URL');
+      expect(settings).not.toHaveProperty('EXPO_NATIVE_VARIANTS_ORIGINAL_BUILD_SETTINGS');
+    }
+  });
+
   it('clones project and target configurations while preserving base settings', () => {
     const fixture = createProjectFixture();
     const metadata = updateXcodeProject(fixture.project, options);

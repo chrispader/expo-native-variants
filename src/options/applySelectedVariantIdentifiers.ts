@@ -27,6 +27,11 @@ export function applySelectedVariantIdentifiers(
       ...config.ios,
       bundleIdentifier: selectedVariant.iosBundleIdentifier,
     },
+    // Identifies variants that share an application identifier at runtime.
+    extra: {
+      ...config.extra,
+      nativeVariant: selectedVariant.key,
+    },
   };
 }
 

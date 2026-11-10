@@ -259,48 +259,91 @@ describe('normalizeNativeVariants', () => {
     ).toThrow('produce the same bundle identifier "com.acme.app.dev"');
   });
 
-  it('rejects duplicate effective identifiers independently after overrides', () => {
-    expect(() =>
-      normalizeNativeVariants({
-        configName: 'Acme',
-        options: {
-          variant: 'one',
-          variants: {
-            one: {
-              ...variants.development,
-              android: {applicationId: 'com.acme.one'},
-              ios: {bundleIdentifier: 'com.acme.same'},
-            },
-            two: {
-              ...variants.preview,
-              android: {applicationId: 'com.acme.two'},
-              ios: {bundleIdentifier: 'com.acme.SAME'},
-            },
-          },
+  it('allows variants that share identifiers and their URL scheme', () => {
+    const result = normalizeNativeVariants({
+      configName: 'Acme',
+      options: {
+        variant: 'production',
+        ios: {targets: {AcmeShare: {bundleIdentifierSuffix: '.share'}}},
+        variants: {
+          production: {applicationId: 'com.acme.app'},
+          staging: {applicationId: 'com.acme.app'},
         },
-      }),
-    ).toThrow('same iOS bundle identifier');
+      },
+    });
 
+    expect(result.variants.map(({iosBundleIdentifier, urlScheme}) => [iosBundleIdentifier, urlScheme])).toEqual([
+      ['com.acme.app', 'com.acme.app'],
+      ['com.acme.app', 'com.acme.app'],
+    ]);
+  });
+
+  it('rejects a shared URL scheme when the identifiers differ on either platform', () => {
     expect(() =>
       normalizeNativeVariants({
         configName: 'Acme',
         options: {
-          variant: 'one',
+          variant: 'production',
           variants: {
-            one: {
-              ...variants.development,
-              android: {applicationId: 'com.acme.same'},
-              ios: {bundleIdentifier: 'com.acme.ios-one'},
-            },
-            two: {
-              ...variants.preview,
-              android: {applicationId: 'com.acme.SAME'},
-              ios: {bundleIdentifier: 'com.acme.ios-two'},
-            },
+            production: {applicationId: 'com.acme.app'},
+            staging: {applicationId: 'com.acme.app', android: {applicationId: 'com.acme.staging'}},
           },
         },
       }),
-    ).toThrow('same Android application ID');
+    ).toThrow('same URL scheme "com.acme.app" but have different identifiers');
+  });
+
+  it('normalizes per-variant native settings', () => {
+    const result = normalizeNativeVariants({
+      configName: 'Acme',
+      options: {
+        variant: 'production',
+        variants: {
+          production: {
+            applicationId: 'com.acme.app',
+            ios: {
+              buildSettings: {API_URL: 'https://acme.com', OTHER_SWIFT_FLAGS: ['$(inherited)', '-DPROD']},
+              environmentVariables: {OS_ACTIVITY_MODE: 'disable'},
+              launchArguments: ['-FIRDebugEnabled'],
+            },
+            android: {
+              buildConfigFields: {API_URL: 'https://acme.com', ENABLED: true},
+              resValues: {api_label: 'Production'},
+              manifestPlaceholders: {mapsKey: 'key'},
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.selectedVariant).toMatchObject({
+      iosBuildSettings: {API_URL: 'https://acme.com', OTHER_SWIFT_FLAGS: ['$(inherited)', '-DPROD']},
+      iosEnvironmentVariables: {OS_ACTIVITY_MODE: 'disable'},
+      iosLaunchArguments: ['-FIRDebugEnabled'],
+      androidBuildConfigFields: {API_URL: 'https://acme.com', ENABLED: true},
+      androidResValues: {api_label: 'Production'},
+      androidManifestPlaceholders: {mapsKey: 'key'},
+    });
+  });
+
+  it.each([
+    [{ios: {buildSettings: {PRODUCT_BUNDLE_IDENTIFIER: 'x'}}}, 'manages it'],
+    [{ios: {buildSettings: {EXPO_NATIVE_VARIANT_KEY: 'x'}}}, 'manages it'],
+    [{ios: {buildSettings: {'API-URL': 'x'}}}, 'name "API-URL" must start'],
+    [{ios: {buildSettings: {API_URL: 1}}}, 'buildSettings.API_URL must be a string'],
+    [{ios: {environmentVariables: {API_URL: 'a\nb'}}}, 'must not contain control characters'],
+    [{ios: {launchArguments: '-flag'}}, 'launchArguments must be an array'],
+    [{android: {buildConfigFields: {API_URL: null}}}, 'must be a string, a finite number, or a boolean'],
+    [{android: {buildConfigFields: {RATIO: Number.NaN}}}, 'must be a string, a finite number, or a boolean'],
+    [{android: {resValues: {app_name: 'x'}}}, 'manages it'],
+    [{android: {manifestPlaceholders: {nativeVariantScheme: 'x'}}}, 'manages it'],
+  ])('rejects invalid native settings %j', (platformOptions, message) => {
+    expect(() =>
+      normalizeNativeVariants({
+        configName: 'Acme',
+        options: {variants: {production: {applicationId: 'com.acme.app', ...platformOptions}}},
+      }),
+    ).toThrow(message);
   });
 
   it('rejects duplicate URL schemes without case sensitivity', () => {

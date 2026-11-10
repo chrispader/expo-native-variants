@@ -180,9 +180,13 @@ function hashContent(content: string): string {
 
 /** Escapes like Expo's own `app_name`: aapt2 rules first, then XML text. */
 function escapeStringResource(value: string): string {
-    return configPlugins.XML.escapeAndroidString(value.replaceAll('\\', '\\\\'))
-        .replace(/^\?/, '\\?')
+    return escapeAaptString(value)
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
+}
+
+/** Gradle's resValue escapes XML text but leaves aapt2's string rules to the caller. */
+export function escapeAaptString(value: string): string {
+    return configPlugins.XML.escapeAndroidString(value.replaceAll('\\', '\\\\')).replace(/^\?/, '\\?');
 }

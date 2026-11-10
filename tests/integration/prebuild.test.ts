@@ -29,6 +29,7 @@ import {
 } from './fixture';
 import type {PrebuildSettings} from './fixture';
 import {assertLocalizedNamesPrebuild} from './localizedNames';
+import {assertNativeSettingsPrebuild} from './nativeSettings';
 import {assertUpdateChannelPrebuild} from './updateChannels';
 
 const executeFile = promisify(execFile);
@@ -54,6 +55,10 @@ describe('compiled package prebuild', () => {
   });
   it('generates localized display names per variant and reconciles them on rerun', async () => {
     await assertLocalizedNamesPrebuild(consumerRoot, runPrebuild);
+    await writeFile(path.join(consumerRoot, 'app.config.js'), APP_CONFIG, 'utf8');
+  });
+  it('writes per-variant native settings and restores them when the variant changes', async () => {
+    await assertNativeSettingsPrebuild(consumerRoot, runPrebuild);
     await writeFile(path.join(consumerRoot, 'app.config.js'), APP_CONFIG, 'utf8');
   });
   it('reconciles the full matrix across clean, repeated, and changed prebuilds', async () => {
