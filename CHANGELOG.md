@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/chrispader/expo-native-variants/compare/v0.5.0...v0.6.0) (2026-11-10)
+
+
+### Features
+
+* configure native settings per variant and allow shared identifiers ([#28](https://github.com/chrispader/expo-native-variants/issues/28)) ([f015a97](https://github.com/chrispader/expo-native-variants/commit/f015a979b5d914744f817186061eb00f4c6e5270))
+
 ## [0.5.0](https://github.com/chrispader/expo-native-variants/compare/v0.4.0...v0.5.0) (2026-10-29)
 
 
