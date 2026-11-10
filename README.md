@@ -269,7 +269,7 @@ const variant =
 
 Release builds embed the variant's own Expo config. Development builds read the config from the development server, and updates carry the config they were published with. Start the server or publish the update with `NATIVE_VARIANT` set to the variant you want.
 
-The runtime helper contains no config-plugin code and requires no native module of its own. The installed application's identifier remains the source of identity when JavaScript is reloaded or updated. A scheme change does not change bundled `EXPO_PUBLIC_*` variables or Expo's shared `extra` values.
+The runtime helper contains no config-plugin code and requires no native module of its own. The installed application's identifier remains the source of identity when JavaScript is reloaded or updated. Bundled `EXPO_PUBLIC_*` variables are fixed when the JavaScript bundle is built, so selecting another scheme does not change them. Use [native settings](#native-settings) for values that must follow the native build.
 
 ## Update channels
 
@@ -372,7 +372,7 @@ Extension support has been tested with `@bacons/apple-targets@5.0.0` using clean
 
 Expo SDK 57's default iOS template does not enable scene lifecycle support. A build linked with the iOS 27 SDK can crash on iOS 27 before JavaScript starts. Use Expo's [official scene-support configuration](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md) when targeting that combination. The example's launch tests use iOS 26.5.
 
-The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, Firebase service files, and entitlements are not supported options. Other plugins can still modify native settings, so validate integrations that touch the same files.
+The native dependency graph remains shared. Arbitrary per-variant Expo config objects, different plugin lists, Firebase service files, and entitlements are not supported options. Per-variant values can go through [native settings](#native-settings) instead. Other plugins can still modify native settings, so validate integrations that touch the same files.
 
 Remote update routing is not isolated by application identifiers alone. Configure [update channels](#update-channels) and test runtime compatibility, and publish with the intended `NATIVE_VARIANT`: a downloaded update's manifest can replace the embedded Expo config. The example disables remote updates.
 
@@ -380,9 +380,9 @@ EAS support remains experimental until its credential preflight and cloud artifa
 
 ## Example and development
 
-The [example](./example) contains three variants and displays the installed identifier, resolved variant, and debug/release mode. Install the repository dependencies with `npm install`, build the package, generate the example's native projects, and open its iOS workspace or Android project.
+The [example](./example) contains three variants and displays the installed identifier, resolved variant, and debug/release mode. Each variant also sets its own API URL through native settings. Install the repository dependencies with `npm install`, build the package, generate the example's native projects, and open its iOS workspace or Android project.
 
-Run the root package scripts with `npm run <script>`. Available scripts include `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
+Run the root package scripts with `npm run <script>`. Available scripts include `build`, `typecheck`, `test`, `test:integration`, and `verify:package`. After generating the example and installing native dependencies, `build:native:android` and `build:native:ios` build every debug/release combination without another prebuild. They check each built app's identifier, display name, embedded config, JavaScript bundle, and API URL. CI runs these builds on pull requests that change the plugin source, the example, or dependencies. Native build validation requires Xcode with CocoaPods on macOS, or an Android SDK and compatible Java installation. Keep the example's generated native folders out of commits.
 
 The `example` script forwards a script name and any following arguments to the example workspace. Use `npm run example -- start`, `npm run example -- prebuild`, or `npm run example -- config` from the repository root.
 

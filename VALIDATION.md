@@ -99,6 +99,6 @@ Expo `58.0.0-preview.3` passed an isolated clean prebuild advisory check. Its na
 
 The default Expo 57 template crashes before React Native starts when launched on iOS 27 after linking with the iOS 27 SDK. The crash identifies UIKit's scene-lifecycle assertion. The same release runs on iOS 26.5. Expo documents an [official scene-support opt-in](https://github.com/expo/fyi/blob/main/ios-scene-lifecycle.md); this example does not enable or validate it.
 
-The manual native CI workflow selects Xcode 26.6 on the macOS 26 runner. Local build results do not establish that the cloud native workflow has passed.
+The native CI workflow selects Xcode 26.6 on the macOS 26 runner. Since November 10, 2026, it also runs on pull requests that change the plugin source, the example, or dependencies. Local build results do not establish that the cloud native workflow has passed.
 
 EAS cloud builds, provisioning profiles, signed archives, remote updates, OAuth callbacks, and integrations outside the documented initial scope remain unverified. The Android development launcher's fixed authentication scheme remains shared between installed debug clients.
